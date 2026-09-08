@@ -1,0 +1,16 @@
+# FRI collector dependencies.
+# The flopkit SDK (https://github.com/0o0r7/flopkit-sdk) is the user's own
+# open-source SDK and provides production-grade Technocore client logic,
+# Ed25519 DID handling, and signed-write utilities. We use it as a git
+# dependency so we always track main.
+
+# Core HTTP + crypto (transitive via flopkit, but pinned for direct use too)
+httpx>=0.27.0
+cryptography>=42.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# flopkit SDK (user's repo) — installs as `flopkit` package
+flopkit @ git+https://github.com/0o0r7/flopkit-sdk.git@main#subdirectory=sdk
