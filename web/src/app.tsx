@@ -30,17 +30,20 @@ type View =
   | { kind: "tab"; tab: Tab }
   | { kind: "profile"; did: string };
 
-function viewFromHash(): View {
+function viewFromHash(): View | null {
   if (typeof window === "undefined") return { kind: "tab", tab: "rooms" };
   const h = window.location.hash;
   const did = didFromHash(h);
   if (did) return { kind: "profile", did };
   const lower = h.toLowerCase();
+  if (lower === "" || lower === "#") return { kind: "tab", tab: "rooms" };
   if (lower.startsWith("#dids")) return { kind: "tab", tab: "dids" };
   if (lower.startsWith("#kibble")) return { kind: "tab", tab: "kibble" };
   if (lower.startsWith("#tclk")) return { kind: "tab", tab: "tclk" };
   if (lower.startsWith("#reputation")) return { kind: "tab", tab: "reputation" };
-  return { kind: "tab", tab: "rooms" };
+  // Unknown hash (e.g., #gpu-miners, #did:key:..., #k12345...) — don't change the view.
+  // This prevents page-component hash updates from fighting with tab switching.
+  return null;
 }
 
 export function App() {
@@ -50,7 +53,7 @@ export function App() {
   const [tclk, setTclk] = useState<TclkIndex | null>(null);
   const [reputation, setReputation] = useState<ReputationIndex | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>(() => viewFromHash());
+  const [view, setView] = useState<View>(() => viewFromHash() ?? { kind: "tab", tab: "rooms" });
   const [lookupInput, setLookupInput] = useState("");
 
   useEffect(() => {
@@ -96,7 +99,8 @@ export function App() {
 
   useEffect(() => {
     function onHash() {
-      setView(viewFromHash());
+      const next = viewFromHash();
+      if (next) setView(next);
     }
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
