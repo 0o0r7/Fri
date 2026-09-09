@@ -8,8 +8,10 @@ the identity parameter is only loaded when signed writes are needed (Phase 6).
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Dict, List
 
+import httpx
 from flopkit.config import TechnocoreConfig
 from flopkit.technocore import (
     DuplicateMessageError,
@@ -35,6 +37,13 @@ __all__ = [
     "NoteConflictError",
 ]
 
+# The /rooms endpoint is heavier than individual room reads — it returns
+# engagement metrics for ALL rooms. Under load it can take >25s, so we give
+# it a longer timeout and more retries than the default.
+ROOMS_TIMEOUT = 60.0
+ROOMS_MAX_RETRIES = 3
+ROOMS_RETRY_DELAY = 2.0  # seconds, doubled each retry
+
 
 def _client() -> TechnocoreClient:
     """Build a read-only TechnocoreClient with FRI's user-agent.
@@ -56,15 +65,73 @@ def fetch_rooms(limit: int = 150) -> Dict[str, Any]:
     The flopkit client's list_rooms() returns text/plain, so we hit the JSON
     endpoint directly via its underlying httpx client. This keeps the schema
     we depend on (engagement metrics, room names, topics) consistent.
+
+    This endpoint is heavy — it returns engagement metrics for ALL rooms.
+    Under load it can take >25s, so we use a longer timeout (60s) and retry
+    with exponential backoff (3 retries: 2s, 4s, 8s).
     """
-    with _client() as client:
-        r = client._client.get(
-            "/rooms",
-            params={"format": "json", "limit": limit},
-            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-        )
-        r.raise_for_status()
-        return r.json()
+    last_exc: Exception | None = None
+    for attempt in range(ROOMS_MAX_RETRIES + 1):
+        try:
+            with _client() as client:
+                r = client._client.get(
+                    "/rooms",
+                    params={"format": "json", "limit": limit},
+                    headers={
+                        "User-Agent": USER_AGENT,
+                        "Accept": "application/json",
+                    },
+                    timeout=ROOMS_TIMEOUT,
+                )
+                r.raise_for_status()
+                return r.json()
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.PoolTimeout) as e:
+            last_exc = e
+            if attempt < ROOMS_MAX_RETRIES:
+                delay = ROOMS_RETRY_DELAY * (2 ** attempt)
+                log.warning(
+                    "fetch_rooms attempt %d/%d timed out, retrying in %.1fs: %s",
+                    attempt + 1,
+                    ROOMS_MAX_RETRIES + 1,
+                    delay,
+                    e,
+                )
+                time.sleep(delay)
+            else:
+                log.error("fetch_rooms failed after %d retries: %s", ROOMS_MAX_RETRIES, e)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                # Rate limited — retry after backoff
+                last_exc = e
+                if attempt < ROOMS_MAX_RETRIES:
+                    delay = ROOMS_RETRY_DELAY * (2 ** attempt)
+                    log.warning(
+                        "fetch_rooms rate limited (429), retrying in %.1fs", delay
+                    )
+                    time.sleep(delay)
+                else:
+                    raise
+            else:
+                raise
+        except Exception as e:
+            last_exc = e
+            if attempt < ROOMS_MAX_RETRIES:
+                delay = ROOMS_RETRY_DELAY * (2 ** attempt)
+                log.warning(
+                    "fetch_rooms attempt %d/%d failed (%s), retrying in %.1fs",
+                    attempt + 1,
+                    ROOMS_MAX_RETRIES + 1,
+                    type(e).__name__,
+                    delay,
+                )
+                time.sleep(delay)
+            else:
+                raise
+
+    # All retries exhausted
+    raise TechnocoreError(
+        f"fetch_rooms failed after {ROOMS_MAX_RETRIES + 1} attempts: {last_exc}"
+    )
 
 
 def fetch_room_messages(room: str, limit: int = MESSAGES_PER_ROOM) -> List[Dict[str, Any]]:
