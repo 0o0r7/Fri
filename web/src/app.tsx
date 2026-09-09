@@ -7,6 +7,7 @@ import { TclkPage } from "@/components/tclk-page";
 import { ReputationPage } from "@/components/reputation-page";
 import { DidProfilePage } from "@/components/did-profile-page";
 import { IndexPageSkeleton } from "@/components/skeleton";
+import { LiveTicker } from "@/components/live-ticker";
 import { FriMark } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import { didFromHash, didToHash } from "@/lib/did-profile";
@@ -178,6 +179,7 @@ export function App() {
             </form>
           </div>
         </nav>
+        <LiveTicker />
         <DidProfilePage
           did={view.did}
           didIndex={dids}
@@ -240,6 +242,7 @@ export function App() {
         </div>
       </nav>
 
+      <LiveTicker />
       {tab === "rooms" ? (
         <IndexPage feed={feed} />
       ) : tab === "dids" ? (

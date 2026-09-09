@@ -1,0 +1,237 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { useLiveFeed, type TcMessage } from "@/hooks/useLiveFeed";
+import { tinyDid } from "@/lib/format";
+
+type Source = "events" | "tclk" | "kibble";
+
+type TickerItem = {
+  id: string;
+  source: Source;
+  seq: number;
+  ts: string;
+  from: string;
+  text: string;
+  label: string;
+  color: string;
+};
+
+const SOURCE_CONFIG: Record<Source, { label: string; color: string; emoji: string }> = {
+  events: { label: "ROOM", color: "text-accent", emoji: "🆕" },
+  tclk: { label: "TCLK", color: "text-good", emoji: "🔵" },
+  kibble: { label: "WORK", color: "text-mid", emoji: "⚙️" },
+};
+
+function classifyText(source: Source, text: string): { label: string; color: string } {
+  if (source === "events") {
+    if (text.startsWith("created ")) {
+      const name = text.slice(8).trim();
+      return { label: `room: ${name}`, color: "text-accent" };
+    }
+    return { label: text.slice(0, 60), color: "text-accent" };
+  }
+  if (source === "tclk") {
+    if (text.startsWith("tclk1 ")) {
+      try {
+        const json = JSON.parse(text.slice(6));
+        const t = json.type ?? "?";
+        const amount = json.amount ?? "";
+        const asset = json.asset ?? "";
+        const outcome = json.outcome ?? "";
+        if (t === "offer") return { label: `OFFER ${amount} ${asset}`, color: "text-accent-2" };
+        if (t === "accept") return { label: "ACCEPT", color: "text-accent" };
+        if (t === "lock") return { label: "LOCK", color: "text-mid" };
+        if (t === "reveal") return { label: "REVEAL", color: "text-good" };
+        if (t === "refund") return { label: "REFUND", color: "text-low" };
+        if (t === "receipt") return { label: `RECEIPT ${outcome}`, color: "text-good" };
+        return { label: t.toUpperCase(), color: "text-muted" };
+      } catch {
+        return { label: "tclk frame", color: "text-muted" };
+      }
+    }
+    return { label: text.slice(0, 60), color: "text-muted" };
+  }
+  if (source === "kibble") {
+    if (text.startsWith("JOB v1")) return { label: "JOB posted", color: "text-accent" };
+    if (text.startsWith("CLAIM v1")) return { label: "CLAIM", color: "text-mid" };
+    if (text.startsWith("DELIVER v1")) return { label: "DELIVER", color: "text-accent-2" };
+    if (text.startsWith("RESULT v1")) return { label: "RESULT", color: "text-accent-2" };
+    if (text.startsWith("ATTEST v1")) {
+      const useful = text.includes("| useful |");
+      return {
+        label: useful ? "ATTEST useful" : "ATTEST not",
+        color: useful ? "text-good" : "text-low",
+      };
+    }
+    if (text.startsWith("ACCEPT v1")) return { label: "ACCEPT", color: "text-good" };
+    return { label: text.slice(0, 40), color: "text-muted" };
+  }
+  return { label: text.slice(0, 40), color: "text-muted" };
+}
+
+function toTickerItem(msg: TcMessage, source: Source): TickerItem | null {
+  if (!msg.seq || !msg.text) return null;
+  const { label, color } = classifyText(source, msg.text);
+  return {
+    id: `${source}-${msg.seq}`,
+    source,
+    seq: msg.seq,
+    ts: msg.ts ?? "",
+    from: msg.from ?? "",
+    text: msg.text,
+    label,
+    color,
+  };
+}
+
+const MAX_ITEMS = 50;
+
+export function LiveTicker() {
+  const eventsFeed = useLiveFeed("events");
+  const tclkFeed = useLiveFeed("tclk-offers");
+  const kibbleFeed = useLiveFeed("kibble");
+
+  const [items, setItems] = useState<TickerItem[]>([]);
+  const seenIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const allNew: TickerItem[] = [];
+    for (const m of eventsFeed.messages) {
+      const item = toTickerItem(m, "events");
+      if (item && !seenIds.current.has(item.id)) {
+        seenIds.current.add(item.id);
+        allNew.push(item);
+      }
+    }
+    for (const m of tclkFeed.messages) {
+      const item = toTickerItem(m, "tclk");
+      if (item && !seenIds.current.has(item.id)) {
+        seenIds.current.add(item.id);
+        allNew.push(item);
+      }
+    }
+    for (const m of kibbleFeed.messages) {
+      const item = toTickerItem(m, "kibble");
+      if (item && !seenIds.current.has(item.id)) {
+        seenIds.current.add(item.id);
+        allNew.push(item);
+      }
+    }
+    if (allNew.length > 0) {
+      allNew.sort((a, b) => {
+        if (a.ts && b.ts) return a.ts.localeCompare(b.ts);
+        return a.seq - b.seq;
+      });
+      setItems((prev) => {
+        const next = [...allNew.reverse(), ...prev].slice(0, MAX_ITEMS);
+        return next;
+      });
+    }
+  }, [eventsFeed.messages, tclkFeed.messages, kibbleFeed.messages]);
+
+  const connected = eventsFeed.connected || tclkFeed.connected || kibbleFeed.connected;
+  const error = eventsFeed.error ?? tclkFeed.error ?? kibbleFeed.error;
+
+  const counters = useMemo(() => {
+    return {
+      rooms: eventsFeed.messagesPerMin,
+      deals: tclkFeed.messagesPerMin,
+      jobs: kibbleFeed.messagesPerMin,
+    };
+  }, [eventsFeed.messagesPerMin, tclkFeed.messagesPerMin, kibbleFeed.messagesPerMin]);
+
+  useEffect(() => {
+    if (seenIds.current.size > 500) {
+      const keep = new Set(items.map((i) => i.id));
+      seenIds.current = keep;
+    }
+  }, [items]);
+
+  return (
+    <div className="relative z-20 border-b border-border bg-surface/80 backdrop-blur">
+      <div className="mx-auto flex max-w-screen-2xl items-stretch gap-3 px-4 py-1.5 sm:px-6">
+        <div className="flex shrink-0 items-center gap-2 border-r border-border pr-3">
+          <span
+            className={cn("relative flex size-2", connected ? "text-good" : "text-low")}
+            title={error ?? (connected ? "Live" : "Disconnected")}
+          >
+            <span
+              className={cn(
+                "absolute inline-flex size-full animate-ping rounded-full opacity-75",
+                connected ? "bg-good" : "bg-low",
+              )}
+            />
+            <span
+              className={cn(
+                "relative inline-flex size-2 rounded-full",
+                connected ? "bg-good" : "bg-low",
+              )}
+            />
+          </span>
+          <span className="font-mono text-[10px] tracking-wider text-faint uppercase">
+            {connected ? "LIVE" : "OFFLINE"}
+          </span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3 border-r border-border pr-3">
+          <Counter label="rooms/min" value={counters.rooms} color="text-accent" />
+          <Counter label="deals/min" value={counters.deals} color="text-good" />
+          <Counter label="jobs/min" value={counters.jobs} color="text-mid" />
+        </div>
+
+        <div className="relative min-w-0 flex-1 overflow-hidden">
+          {items.length === 0 ? (
+            <div className="flex h-full items-center text-xs text-faint">
+              {connected ? "Listening for activity…" : error ?? "Connecting…"}
+            </div>
+          ) : (
+            <div className="flex h-full items-center gap-3 overflow-x-auto pb-0.5">
+              {items.slice(0, 12).map((item) => {
+                const cfg = SOURCE_CONFIG[item.source];
+                return (
+                  <div
+                    key={item.id}
+                    className="flex shrink-0 items-center gap-1.5 rounded border border-border bg-elevated px-2 py-0.5"
+                    title={`${item.ts}\n${item.from}\n${item.text.slice(0, 200)}`}
+                  >
+                    <span className="text-[10px]">{cfg.emoji}</span>
+                    <span className={cn("font-mono text-[10px] tracking-wider uppercase", cfg.color)}>
+                      {cfg.label}
+                    </span>
+                    <span className={cn("text-xs", item.color)}>{item.label}</span>
+                    {item.from && item.from.startsWith("did:key:") ? (
+                      <span className="font-mono text-[10px] text-faint">
+                        {tinyDid(item.from)}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Counter({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-1">
+      <span className={cn("font-mono text-sm font-medium tabular-nums", color)}>
+        {value}
+      </span>
+      <span className="font-mono text-[10px] tracking-wider text-faint uppercase">
+        {label}
+      </span>
+    </div>
+  );
+}

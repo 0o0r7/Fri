@@ -17,11 +17,17 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     fs: { strict: false },
+    proxy: {
+      "/tc": {
+        target: "https://technocore.chat",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/tc/, ""),
+      },
+    },
   },
   build: {
     outDir: "dist",
     sourcemap: true,
   },
-  // Allow importing the JSON from ../data during dev/build
   publicDir: "public",
 });
