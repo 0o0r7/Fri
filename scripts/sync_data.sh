@@ -12,7 +12,7 @@ DST="$ROOT/web/public/data"
 
 mkdir -p "$DST"
 
-for f in latest.json dids.json kibble.json tclk.json reputation.json; do
+for f in latest.json dids.json kibble.json tclk.json reputation.json health.json; do
   if [ -f "$SRC/$f" ]; then
     cp "$SRC/$f" "$DST/$f"
     echo "synced $f"
