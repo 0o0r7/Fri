@@ -3,6 +3,12 @@ import { ArrowUpRight, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DidRow } from "@/components/did-row";
 import { DidDetail, DidEmptyDetail } from "@/components/did-detail";
+import {
+  LoadMore,
+  StatBand,
+  StatBandItem,
+  usePagination,
+} from "@/components/ui";
 import { filterDids, didIndexStats } from "@/lib/did-filter";
 import { absoluteTime, relativeTime } from "@/lib/format";
 import type { DidIndex, DidSortKey } from "@/lib/types";
@@ -13,6 +19,8 @@ const SORTS: { id: DidSortKey; label: string }[] = [
   { id: "recent", label: "Recent" },
   { id: "avg_len", label: "Avg len" },
 ];
+
+const PAGE_SIZE = 20;
 
 export function DidsPage({ index }: { index: DidIndex }) {
   const [query, setQuery] = useState("");
@@ -26,6 +34,7 @@ export function DidsPage({ index }: { index: DidIndex }) {
     () => filterDids(index.dids, { query, sort }),
     [index.dids, query, sort],
   );
+  const { visible, visibleCount, loadMore, total } = usePagination(dids, PAGE_SIZE);
 
   const selectedDid =
     dids.find((d) => d.did === selected) ?? dids[0] ?? null;
@@ -93,31 +102,35 @@ export function DidsPage({ index }: { index: DidIndex }) {
 
       <section
         aria-label="DID index snapshot"
-        className="relative z-10 border-b border-border bg-surface/60"
+        className="relative z-10 border-b border-border bg-surface/40"
       >
-        <dl className="mx-auto flex max-w-screen-2xl gap-6 overflow-x-auto px-4 py-3 sm:px-6">
-          <UpdatedStat iso={index.generated_at} />
-          <Stat label="Total DIDs" value={stats.total_dids.toLocaleString()} />
-          <Stat
-            label="Sampled msgs"
-            value={stats.sampled_messages.toLocaleString()}
-          />
-          <Stat
-            label="Signed ratio"
-            value={`${(stats.signed_ratio * 100).toFixed(1)}%`}
-            hint="Fraction of sampled messages from did:key writers."
-          />
-          <Stat
-            label="Multi-room"
-            value={stats.multi_room_dids.toLocaleString()}
-            hint="DIDs active in 2+ rooms. A rough diversity signal."
-          />
-        </dl>
+        <div className="mx-auto max-w-screen-2xl px-4 py-3 sm:px-6">
+          <StatBand>
+            <UpdatedStat iso={index.generated_at} />
+            <StatBandItem label="Total DIDs" value={stats.total_dids.toLocaleString()} tone="accent" />
+            <StatBandItem
+              label="Sampled msgs"
+              value={stats.sampled_messages.toLocaleString()}
+            />
+            <StatBandItem
+              label="Signed ratio"
+              value={`${(stats.signed_ratio * 100).toFixed(1)}%`}
+              hint="Fraction of sampled messages from did:key writers."
+              tone="good"
+            />
+            <StatBandItem
+              label="Multi-room"
+              value={stats.multi_room_dids.toLocaleString()}
+              hint="DIDs active in 2+ rooms. A rough diversity signal."
+            />
+          </StatBand>
+        </div>
       </section>
 
       <div className="relative z-10 mx-auto grid min-h-0 w-full max-w-screen-2xl flex-1 grid-cols-1 lg:h-0 lg:grow lg:grid-cols-12 lg:overflow-hidden">
         <div className="flex min-h-0 flex-col border-border lg:col-span-5 lg:h-full lg:border-r">
-          <div className="flex flex-col gap-2 px-4 py-3 sm:px-5">
+          {/* Sticky filter bar */}
+          <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur sm:px-5">
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
               <input
@@ -126,47 +139,27 @@ export function DidsPage({ index }: { index: DidIndex }) {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search DID, fingerprint, or room"
                 aria-label="Search DIDs"
-                className="h-10 w-full rounded-md border border-border bg-elevated pl-10 pr-3 text-sm text-fg placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+                className="h-10 w-full rounded border border-border bg-surface pl-10 pr-3 font-mono text-sm text-fg placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 font-mono text-xs tracking-wider text-faint uppercase">
-                Sort
-              </span>
-              {SORTS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSort(s.id)}
-                  className={cn(
-                    "h-11 min-w-11 rounded-md px-3 text-sm transition-colors duration-150 lg:h-9 lg:text-xs",
-                    sort === s.id
-                      ? "bg-elevated text-fg shadow-[var(--shadow-border)]"
-                      : "text-muted hover:text-fg",
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <FilterRow label="Sort" value={sort} options={SORTS} onChange={setSort} />
             {stats.top_rooms.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="mr-1 font-mono text-xs tracking-wider text-faint uppercase">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 font-mono text-[10px] tracking-wider text-faint uppercase">
                   Top rooms
                 </span>
                 {stats.top_rooms.map((r) => (
                   <span
                     key={r.room}
-                    className="inline-flex items-center gap-1 rounded border border-border bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted"
+                    className="inline-flex items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted"
                   >
                     {r.room}
-                    <span className="text-faint">{r.count}</span>
+                    <span className="text-faint tabular-nums">{r.count}</span>
                   </span>
                 ))}
               </div>
             ) : null}
           </div>
-          <div className="h-px bg-border" />
           <div
             className="min-h-0 flex-1 px-2 py-2 pb-20 sm:px-3 lg:overflow-y-auto"
             role="listbox"
@@ -174,10 +167,10 @@ export function DidsPage({ index }: { index: DidIndex }) {
           >
             {dids.length === 0 ? (
               <div className="px-3 py-16 text-center">
-                <p className="text-sm text-muted">No DIDs match this filter.</p>
+                <p className="font-mono text-sm text-muted">No DIDs match this filter.</p>
                 <button
                   type="button"
-                  className="mt-3 inline-flex h-9 items-center rounded-md px-3 text-sm text-muted transition-colors hover:bg-elevated hover:text-fg"
+                  className="mt-3 inline-flex h-9 items-center rounded border border-border bg-surface px-3 font-mono text-xs text-muted transition-colors hover:border-accent hover:text-fg"
                   onClick={() => {
                     setQuery("");
                     setSort("messages");
@@ -187,8 +180,8 @@ export function DidsPage({ index }: { index: DidIndex }) {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-0.5">
-                {dids.map((did, i) => (
+              <div className="flex flex-col gap-1">
+                {visible.map((did, i) => (
                   <DidRow
                     key={did.did}
                     did={did}
@@ -197,11 +190,17 @@ export function DidsPage({ index }: { index: DidIndex }) {
                     onSelect={selectDid}
                   />
                 ))}
+                <LoadMore
+                  shown={visibleCount}
+                  total={total}
+                  pageSize={PAGE_SIZE}
+                  onLoadMore={loadMore}
+                />
               </div>
             )}
           </div>
-          <p className="hidden px-5 py-2 font-mono text-xs text-faint lg:block">
-            j / k to move · / to search · {dids.length} shown
+          <p className="hidden border-t border-border px-5 py-2 font-mono text-[11px] text-faint lg:block">
+            j / k to move · / to search · {visibleCount} of {total} shown
           </p>
         </div>
 
@@ -217,7 +216,7 @@ export function DidsPage({ index }: { index: DidIndex }) {
           <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
             <button
               type="button"
-              className="inline-flex h-9 items-center rounded-md px-3 text-sm text-muted transition-colors hover:bg-elevated hover:text-fg"
+              className="inline-flex h-9 items-center rounded px-3 font-mono text-xs text-muted transition-colors hover:text-fg"
               onClick={() => setMobileOpen(false)}
             >
               Back to index
@@ -225,7 +224,7 @@ export function DidsPage({ index }: { index: DidIndex }) {
             <button
               type="button"
               aria-label="Close detail"
-              className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-fg"
+              className="inline-flex size-9 items-center justify-center rounded text-muted transition-colors hover:text-fg"
               onClick={() => setMobileOpen(false)}
             >
               <X className="size-4" />
@@ -238,11 +237,11 @@ export function DidsPage({ index }: { index: DidIndex }) {
       ) : null}
 
       <footer className="relative z-10 border-t border-border">
-        <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-4 py-4 text-xs text-faint sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-4 py-4 font-mono text-[11px] text-faint sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>
             DID index v{index.version} · read-only ·{" "}
             <a
-              className="text-muted hover:text-fg"
+              className="text-muted hover:text-accent"
               href={index.source}
               target="_blank"
               rel="noopener noreferrer"
@@ -255,7 +254,7 @@ export function DidsPage({ index }: { index: DidIndex }) {
               href="/data/dids.json"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded border border-border bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted hover:text-fg"
+              className="inline-flex items-center gap-1.5 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
             >
               GET /data/dids.json
               <ArrowUpRight className="size-3" />
@@ -272,24 +271,46 @@ function UpdatedStat({ iso }: { iso: string }) {
   useEffect(() => {
     setRel(relativeTime(iso));
   }, [iso]);
-  return <Stat label="Updated" value={rel ?? absoluteTime(iso)} hint={absoluteTime(iso)} />;
+  return (
+    <StatBandItem
+      label="Updated"
+      value={rel ?? absoluteTime(iso)}
+      hint={absoluteTime(iso)}
+    />
+  );
 }
 
-function Stat({
+function FilterRow<T extends string>({
   label,
   value,
-  hint,
+  options,
+  onChange,
 }: {
   label: string;
-  value: string;
-  hint?: string;
+  value: T;
+  options: { id: T; label: string }[];
+  onChange: (v: T) => void;
 }) {
   return (
-    <div className="shrink-0" title={hint}>
-      <dt className="font-mono text-xs tracking-wider text-faint uppercase">
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 font-mono text-[10px] tracking-wider text-faint uppercase">
         {label}
-      </dt>
-      <dd className="mt-0.5 font-mono text-sm tabular-nums text-fg">{value}</dd>
+      </span>
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => onChange(opt.id)}
+          className={cn(
+            "inline-flex h-8 min-w-8 items-center rounded border px-2.5 font-mono text-xs transition-colors",
+            value === opt.id
+              ? "border-accent bg-accent/10 text-accent"
+              : "border-border bg-surface text-muted hover:text-fg",
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }

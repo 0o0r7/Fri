@@ -16,10 +16,16 @@ type TickerItem = {
   color: string;
 };
 
-const SOURCE_CONFIG: Record<Source, { label: string; color: string; emoji: string }> = {
-  events: { label: "ROOM", color: "text-accent", emoji: "🆕" },
-  tclk: { label: "TCLK", color: "text-good", emoji: "🔵" },
-  kibble: { label: "WORK", color: "text-mid", emoji: "⚙️" },
+const SOURCE_CONFIG: Record<
+  Source,
+  { label: string; color: string; tag: string }
+> = {
+  // FLOP Cyan for room events — primary signal
+  events: { label: "ROOM", color: "text-accent", tag: "ROOM" },
+  // Electric Green for TCLK deals — verified/positive
+  tclk: { label: "TCLK", color: "text-good", tag: "TCLK" },
+  // Amber for Kibble work
+  kibble: { label: "WORK", color: "text-mid", tag: "WORK" },
 };
 
 function classifyText(source: Source, text: string): { label: string; color: string } {
@@ -148,11 +154,15 @@ export function LiveTicker() {
   }, [items]);
 
   return (
-    <div className="relative z-20 border-b border-border bg-surface/80 backdrop-blur">
+    <div className="relative z-20 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex max-w-screen-2xl items-stretch gap-3 px-4 py-1.5 sm:px-6">
+        {/* Live indicator */}
         <div className="flex shrink-0 items-center gap-2 border-r border-border pr-3">
           <span
-            className={cn("relative flex size-2", connected ? "text-good" : "text-low")}
+            className={cn(
+              "relative flex size-2",
+              connected ? "text-good" : "text-low",
+            )}
             title={error ?? (connected ? "Live" : "Disconnected")}
           >
             <span
@@ -168,37 +178,52 @@ export function LiveTicker() {
               )}
             />
           </span>
-          <span className="font-mono text-[10px] tracking-wider text-faint uppercase">
+          <span
+            className={cn(
+              "font-mono text-[10px] tracking-[0.18em] uppercase",
+              connected ? "text-good" : "text-low",
+            )}
+          >
             {connected ? "LIVE" : "OFFLINE"}
           </span>
         </div>
 
+        {/* Per-source counters */}
         <div className="flex shrink-0 items-center gap-3 border-r border-border pr-3">
           <Counter label="rooms/min" value={counters.rooms} color="text-accent" />
           <Counter label="deals/min" value={counters.deals} color="text-good" />
           <Counter label="jobs/min" value={counters.jobs} color="text-mid" />
         </div>
 
+        {/* Scrolling feed */}
         <div className="relative min-w-0 flex-1 overflow-hidden">
           {items.length === 0 ? (
-            <div className="flex h-full items-center text-xs text-faint">
-              {connected ? "Listening for activity…" : error ?? "Connecting…"}
+            <div className="flex h-full items-center font-mono text-[11px] text-faint">
+              {connected
+                ? "Listening for activity…"
+                : error ?? "Connecting…"}
             </div>
           ) : (
-            <div className="flex h-full items-center gap-3 overflow-x-auto pb-0.5">
+            <div className="flex h-full items-center gap-2 overflow-x-auto pb-0.5">
               {items.slice(0, 12).map((item) => {
                 const cfg = SOURCE_CONFIG[item.source];
                 return (
                   <div
                     key={item.id}
-                    className="flex shrink-0 items-center gap-1.5 rounded border border-border bg-elevated px-2 py-0.5"
+                    className="flex shrink-0 items-center gap-1.5 rounded border border-border bg-bg/60 px-2 py-0.5"
                     title={`${item.ts}\n${item.from}\n${item.text.slice(0, 200)}`}
                   >
-                    <span className="text-[10px]">{cfg.emoji}</span>
-                    <span className={cn("font-mono text-[10px] tracking-wider uppercase", cfg.color)}>
-                      {cfg.label}
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded px-1 font-mono text-[9px] font-bold tracking-wider uppercase",
+                        cfg.color,
+                      )}
+                    >
+                      {cfg.tag}
                     </span>
-                    <span className={cn("text-xs", item.color)}>{item.label}</span>
+                    <span className={cn("font-mono text-[11px]", item.color)}>
+                      {item.label}
+                    </span>
                     {item.from && item.from.startsWith("did:key:") ? (
                       <span className="font-mono text-[10px] text-faint">
                         {tinyDid(item.from)}
@@ -226,7 +251,7 @@ function Counter({
 }) {
   return (
     <div className="flex items-baseline gap-1">
-      <span className={cn("font-mono text-sm font-medium tabular-nums", color)}>
+      <span className={cn("font-mono text-sm font-bold tabular-nums", color)}>
         {value}
       </span>
       <span className="font-mono text-[10px] tracking-wider text-faint uppercase">

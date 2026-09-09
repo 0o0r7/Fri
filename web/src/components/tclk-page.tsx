@@ -7,12 +7,18 @@ import {
   TclkContractDetail,
 } from "@/components/tclk-contract-detail";
 import {
+  LoadMore,
+  StatBand,
+  StatBandItem,
+  usePagination,
+} from "@/components/ui";
+import {
   filterContracts,
   tclkIndexStats,
   type TclkStateFilter,
 } from "@/lib/tclk-filter";
 import { absoluteTime, relativeTime } from "@/lib/format";
-import type { TclkIndex, TclkSortKey, TclkState } from "@/lib/types";
+import type { TclkIndex, TclkSortKey } from "@/lib/types";
 
 const SORTS: { id: TclkSortKey; label: string }[] = [
   { id: "recent", label: "Recent" },
@@ -31,6 +37,8 @@ const STATES: { id: TclkStateFilter; label: string }[] = [
   { id: "refunded", label: "Refunded" },
 ];
 
+const PAGE_SIZE = 20;
+
 export function TclkPage({ index }: { index: TclkIndex }) {
   const [query, setQuery] = useState("");
   const [state, setState] = useState<TclkStateFilter>("all");
@@ -44,6 +52,7 @@ export function TclkPage({ index }: { index: TclkIndex }) {
     () => filterContracts(index.contracts, { query, state, sort }),
     [index.contracts, query, state, sort],
   );
+  const { visible, visibleCount, loadMore, total } = usePagination(contracts, PAGE_SIZE);
 
   const selectedContract =
     contracts.find((c) => c.contract_id === selected) ?? contracts[0] ?? null;
@@ -114,30 +123,35 @@ export function TclkPage({ index }: { index: TclkIndex }) {
 
       <section
         aria-label="TCLK snapshot"
-        className="relative z-10 border-b border-border bg-surface/60"
+        className="relative z-10 border-b border-border bg-surface/40"
       >
-        <dl className="mx-auto flex max-w-screen-2xl gap-6 overflow-x-auto px-4 py-3 sm:px-6">
-          <UpdatedStat iso={index.generated_at} />
-          <Stat label="Contracts" value={stats.total_contracts.toLocaleString()} />
-          <Stat label="Frames" value={index.total_frames.toLocaleString()} />
-          <Stat
-            label="Claimed"
-            value={stats.claimed.toLocaleString()}
-            hint="Deals where payee revealed the secret and claimed funds."
-          />
-          <Stat
-            label="Refunded"
-            value={stats.refunded.toLocaleString()}
-            hint="Deals where payee failed to reveal and payer reclaimed."
-          />
-          <Stat
-            label="Refund rate"
-            value={refundRatePct}
-            hint="refunded / (claimed + refunded). Lower is better for payee reliability."
-          />
-        </dl>
+        <div className="mx-auto max-w-screen-2xl px-4 py-3 sm:px-6">
+          <StatBand>
+            <UpdatedStat iso={index.generated_at} />
+            <StatBandItem label="Contracts" value={stats.total_contracts.toLocaleString()} tone="accent" />
+            <StatBandItem label="Frames" value={index.total_frames.toLocaleString()} />
+            <StatBandItem
+              label="Claimed"
+              value={stats.claimed.toLocaleString()}
+              hint="Deals where payee revealed the secret and claimed funds."
+              tone="good"
+            />
+            <StatBandItem
+              label="Refunded"
+              value={stats.refunded.toLocaleString()}
+              hint="Deals where payee failed to reveal and payer reclaimed."
+              tone="low"
+            />
+            <StatBandItem
+              label="Refund rate"
+              value={refundRatePct}
+              hint="refunded / (claimed + refunded). Lower is better for payee reliability."
+            />
+          </StatBand>
+        </div>
       </section>
-      <p className="relative z-10 mx-auto w-full max-w-screen-2xl px-4 py-2 text-xs text-faint sm:px-6">
+
+      <p className="relative z-10 mx-auto w-full max-w-screen-2xl px-4 py-2 font-mono text-[11px] text-faint sm:px-6">
         TCLK/1 (Technocore Lock Protocol) deal-flow analytics. FRI parses{" "}
         <code className="font-mono text-muted">offer/accept/lock/reveal/refund/receipt</code>{" "}
         frames from <code className="font-mono text-muted">/r/tclk-offers</code>.
@@ -146,7 +160,8 @@ export function TclkPage({ index }: { index: TclkIndex }) {
 
       <div className="relative z-10 mx-auto grid min-h-0 w-full max-w-screen-2xl flex-1 grid-cols-1 lg:h-0 lg:grow lg:grid-cols-12 lg:overflow-hidden">
         <div className="flex min-h-0 flex-col border-border lg:col-span-5 lg:h-full lg:border-r">
-          <div className="flex flex-col gap-2 px-4 py-3 sm:px-5">
+          {/* Sticky filter bar */}
+          <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur sm:px-5">
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
               <input
@@ -155,67 +170,28 @@ export function TclkPage({ index }: { index: TclkIndex }) {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search contract id, DID, asset, or rail"
                 aria-label="Search TCLK contracts"
-                className="h-10 w-full rounded-md border border-border bg-elevated pl-10 pr-3 text-sm text-fg placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+                className="h-10 w-full rounded border border-border bg-surface pl-10 pr-3 font-mono text-sm text-fg placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 font-mono text-xs tracking-wider text-faint uppercase">
-                State
-              </span>
-              {STATES.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setState(s.id)}
-                  className={cn(
-                    "h-9 min-w-9 rounded-md px-2.5 text-xs transition-colors duration-150",
-                    state === s.id
-                      ? "bg-elevated text-fg shadow-[var(--shadow-border)]"
-                      : "text-muted hover:text-fg",
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 font-mono text-xs tracking-wider text-faint uppercase">
-                Sort
-              </span>
-              {SORTS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSort(s.id)}
-                  className={cn(
-                    "h-9 min-w-9 rounded-md px-2.5 text-xs transition-colors duration-150",
-                    sort === s.id
-                      ? "bg-elevated text-fg shadow-[var(--shadow-border)]"
-                      : "text-muted hover:text-fg",
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <FilterRow label="State" value={state} options={STATES} onChange={setState} />
+            <FilterRow label="Sort" value={sort} options={SORTS} onChange={setSort} />
             {stats.top_payers.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="mr-1 font-mono text-xs tracking-wider text-faint uppercase">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 font-mono text-[10px] tracking-wider text-faint uppercase">
                   Top payers
                 </span>
                 {stats.top_payers.map((p) => (
                   <span
                     key={p.did}
-                    className="inline-flex items-center gap-1 rounded border border-border bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted"
+                    className="inline-flex items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted"
                   >
                     {p.did.slice(8, 16)}…
-                    <span className="text-accent">{p.count}</span>
+                    <span className="text-accent tabular-nums">{p.count}</span>
                   </span>
                 ))}
               </div>
             ) : null}
           </div>
-          <div className="h-px bg-border" />
           <div
             className="min-h-0 flex-1 px-2 py-2 pb-20 sm:px-3 lg:overflow-y-auto"
             role="listbox"
@@ -223,10 +199,10 @@ export function TclkPage({ index }: { index: TclkIndex }) {
           >
             {contracts.length === 0 ? (
               <div className="px-3 py-16 text-center">
-                <p className="text-sm text-muted">No contracts match these filters.</p>
+                <p className="font-mono text-sm text-muted">No contracts match these filters.</p>
                 <button
                   type="button"
-                  className="mt-3 inline-flex h-9 items-center rounded-md px-3 text-sm text-muted transition-colors hover:bg-elevated hover:text-fg"
+                  className="mt-3 inline-flex h-9 items-center rounded border border-border bg-surface px-3 font-mono text-xs text-muted transition-colors hover:border-accent hover:text-fg"
                   onClick={() => {
                     setQuery("");
                     setState("all");
@@ -237,8 +213,8 @@ export function TclkPage({ index }: { index: TclkIndex }) {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-0.5">
-                {contracts.map((contract, i) => (
+              <div className="flex flex-col gap-1">
+                {visible.map((contract, i) => (
                   <TclkContractRow
                     key={contract.contract_id}
                     contract={contract}
@@ -247,11 +223,17 @@ export function TclkPage({ index }: { index: TclkIndex }) {
                     onSelect={selectContract}
                   />
                 ))}
+                <LoadMore
+                  shown={visibleCount}
+                  total={total}
+                  pageSize={PAGE_SIZE}
+                  onLoadMore={loadMore}
+                />
               </div>
             )}
           </div>
-          <p className="hidden px-5 py-2 font-mono text-xs text-faint lg:block">
-            j / k to move · / to search · {contracts.length} shown
+          <p className="hidden border-t border-border px-5 py-2 font-mono text-[11px] text-faint lg:block">
+            j / k to move · / to search · {visibleCount} of {total} shown
           </p>
         </div>
 
@@ -271,7 +253,7 @@ export function TclkPage({ index }: { index: TclkIndex }) {
           <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
             <button
               type="button"
-              className="inline-flex h-9 items-center rounded-md px-3 text-sm text-muted transition-colors hover:bg-elevated hover:text-fg"
+              className="inline-flex h-9 items-center rounded px-3 font-mono text-xs text-muted transition-colors hover:text-fg"
               onClick={() => setMobileOpen(false)}
             >
               Back to index
@@ -279,7 +261,7 @@ export function TclkPage({ index }: { index: TclkIndex }) {
             <button
               type="button"
               aria-label="Close detail"
-              className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-fg"
+              className="inline-flex size-9 items-center justify-center rounded text-muted transition-colors hover:text-fg"
               onClick={() => setMobileOpen(false)}
             >
               <X className="size-4" />
@@ -292,11 +274,11 @@ export function TclkPage({ index }: { index: TclkIndex }) {
       ) : null}
 
       <footer className="relative z-10 border-t border-border">
-        <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-4 py-4 text-xs text-faint sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-4 py-4 font-mono text-[11px] text-faint sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>
             TCLK index v{index.version} ({index.protocol_version}) · read-only ·{" "}
             <a
-              className="text-muted hover:text-fg"
+              className="text-muted hover:text-accent"
               href={index.source}
               target="_blank"
               rel="noopener noreferrer"
@@ -312,7 +294,7 @@ export function TclkPage({ index }: { index: TclkIndex }) {
               href="/data/tclk.json"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded border border-border bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted hover:text-fg"
+              className="inline-flex items-center gap-1.5 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
             >
               GET /data/tclk.json
               <ArrowUpRight className="size-3" />
@@ -321,7 +303,7 @@ export function TclkPage({ index }: { index: TclkIndex }) {
               href={index.spec_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded border border-border bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted hover:text-fg"
+              className="inline-flex items-center gap-1.5 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
             >
               SPEC
               <ArrowUpRight className="size-3" />
@@ -338,24 +320,46 @@ function UpdatedStat({ iso }: { iso: string }) {
   useEffect(() => {
     setRel(relativeTime(iso));
   }, [iso]);
-  return <Stat label="Updated" value={rel ?? absoluteTime(iso)} hint={absoluteTime(iso)} />;
+  return (
+    <StatBandItem
+      label="Updated"
+      value={rel ?? absoluteTime(iso)}
+      hint={absoluteTime(iso)}
+    />
+  );
 }
 
-function Stat({
+function FilterRow<T extends string>({
   label,
   value,
-  hint,
+  options,
+  onChange,
 }: {
   label: string;
-  value: string;
-  hint?: string;
+  value: T;
+  options: { id: T; label: string }[];
+  onChange: (v: T) => void;
 }) {
   return (
-    <div className="shrink-0" title={hint}>
-      <dt className="font-mono text-xs tracking-wider text-faint uppercase">
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 font-mono text-[10px] tracking-wider text-faint uppercase">
         {label}
-      </dt>
-      <dd className="mt-0.5 font-mono text-sm tabular-nums text-fg">{value}</dd>
+      </span>
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => onChange(opt.id)}
+          className={cn(
+            "inline-flex h-8 min-w-8 items-center rounded border px-2.5 font-mono text-xs transition-colors",
+            value === opt.id
+              ? "border-accent bg-accent/10 text-accent"
+              : "border-border bg-surface text-muted hover:text-fg",
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }

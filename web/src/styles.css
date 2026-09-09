@@ -1,29 +1,47 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #0a0b0d;
-  --color-surface: #111317;
-  --color-elevated: #16191e;
-  --color-border: #1f232b;
-  --color-fg: #e7e9ee;
-  --color-muted: #9aa0aa;
-  --color-faint: #5b616e;
-  --color-accent: #7c5cff;
-  --color-accent-2: #4dd1ff;
-  --color-good: #4ade80;
-  --color-good-dim: rgba(74, 222, 128, 0.12);
-  --color-mid: #facc15;
-  --color-mid-dim: rgba(250, 204, 21, 0.12);
-  --color-low: #f87171;
-  --color-low-dim: rgba(248, 113, 113, 0.12);
+/*
+ * FRI — Flop Reputation Index
+ * FLOP Design DNA: deep navy substrate, FLOP Cyan accent, Space Mono headings.
+ * Color tokens preserve the existing tailwind classnames (bg-bg, text-accent,
+ * text-good, etc.) so all components pick up the new palette automatically.
+ */
 
+@theme {
+  /* Substrate + surfaces */
+  --color-bg: #0a1128; /* deep navy substrate */
+  --color-surface: #151d32; /* card background */
+  --color-elevated: #232a3e; /* elevated surface (FLOP surface-light) */
+  --color-border: #232a3e; /* subtle border = surface-light */
+
+  /* Text */
+  --color-fg: #f5f7fa; /* ice white text */
+  --color-muted: #a1a7ae; /* grey text */
+  --color-faint: #6b7280; /* fainter grey for hints/labels */
+
+  /* Brand signals */
+  --color-accent: #00b4d8; /* FLOP Cyan — primary signal, headings, links */
+  --color-accent-2: #3dc5e0; /* lighter cyan for hover */
+  --color-accent-hover: #3dc5e0;
+
+  /* Status colors */
+  --color-good: #32d74b; /* Electric Green — verified/positive */
+  --color-good-dim: rgba(50, 215, 75, 0.14);
+  --color-mid: #f5a524; /* amber for mid-band scores (FLOP has no warning) */
+  --color-mid-dim: rgba(245, 165, 36, 0.14);
+  --color-low: #ff453a; /* red for errors/refunds */
+  --color-low-dim: rgba(255, 69, 58, 0.14);
+  --color-blue: #0466c8; /* fill only, never text */
+
+  /* Soft shadows used to fake 1px borders via box-shadow */
   --shadow-border: 0 0 0 1px var(--color-border);
   --shadow-border-hover: 0 0 0 1px var(--color-accent);
 
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /* Typography — Space Mono for headings/labels/data, Inter for body */
+  --font-mono: "Space Mono", ui-monospace, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 @layer base {
@@ -42,31 +60,134 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+  /* Headings default to Space Mono — FLOP pattern */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
+  }
   button,
   [role="button"] {
     cursor: pointer;
   }
   ::selection {
     background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+    color: var(--color-fg);
+  }
+  /* Scrollbars — thin, FLOP-aligned */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
   }
 }
 
 @layer utilities {
+  /*
+   * FLOP grid background: 32px × 32px subtle dark-grey overlay.
+   * Applied as a fixed full-bleed layer behind content.
+   */
   .bg-grid {
     background-image:
-      linear-gradient(to right, var(--color-border) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+      linear-gradient(
+        to right,
+        rgba(35, 42, 62, 0.46) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        rgba(35, 42, 62, 0.46) 1px,
+        transparent 1px
+      );
     background-size: 32px 32px;
     background-position: -1px -1px;
-    opacity: 0.18;
   }
+
+  /*
+   * FLOP card surface — used by Metric, Card, DefCallout, etc.
+   * 4px radius, surface bg, 1px border via box-shadow.
+   */
+  .flop-card {
+    background: var(--color-surface);
+    border-radius: 4px;
+    box-shadow: var(--shadow-border);
+  }
+  .flop-card-lg {
+    background: var(--color-surface);
+    border-radius: 8px;
+    box-shadow: var(--shadow-border);
+  }
+
+  /*
+   * FLOP metrics band — grid auto-fit minmax(150px, 1fr), 1px gap = grid lines.
+   * Each cell sits flush with its neighbour, separated only by the border color.
+   */
+  .flop-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: var(--shadow-border);
+  }
+  .flop-metrics > * {
+    background: var(--color-surface);
+  }
+
+  /* FLOP def callout: surface bg + left border 2px accent */
+  .flop-def {
+    background: var(--color-surface);
+    border-left: 2px solid var(--color-accent);
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px;
+  }
+
+  /*
+   * FLOP section heading — Space Mono 700, cyan, with # anchor on hover.
+   * Pair with a sibling anchor link that appears on hover.
+   */
+  .flop-section-heading {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--color-accent);
+    letter-spacing: -0.01em;
+  }
+
+  /* Tabular numbers for any data display */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Link that gets a bottom border on hover — FLOP pattern */
+  .flop-link {
+    color: var(--color-accent);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 120ms ease;
+  }
+  .flop-link:hover {
+    border-bottom-color: var(--color-accent);
+  }
+
   .text-balance {
     text-wrap: balance;
   }
   .text-pretty {
     text-wrap: pretty;
-  }
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
   }
 }

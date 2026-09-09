@@ -31,6 +31,14 @@ type View =
   | { kind: "tab"; tab: Tab }
   | { kind: "profile"; did: string };
 
+const TABS: { id: Tab; label: string }[] = [
+  { id: "rooms", label: "Rooms" },
+  { id: "dids", label: "DIDs" },
+  { id: "kibble", label: "Kibble" },
+  { id: "tclk", label: "TCLK" },
+  { id: "reputation", label: "Reputation" },
+];
+
 function viewFromHash(): View | null {
   if (typeof window === "undefined") return { kind: "tab", tab: "rooms" };
   const h = window.location.hash;
@@ -134,7 +142,7 @@ export function App() {
   if (error) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="text-sm font-medium text-low">Could not load feed</p>
+        <p className="font-mono text-sm text-low">Could not load feed</p>
         <p className="max-w-sm text-sm text-pretty text-muted">{error}</p>
         <p className="max-w-sm text-xs text-faint">
           Run the collector:{" "}
@@ -153,32 +161,20 @@ export function App() {
   if (view.kind === "profile") {
     return (
       <>
-        <nav className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/75">
-          <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-2 sm:px-6">
-            <button
-              type="button"
-              onClick={() => switchTab("reputation")}
-              className="flex items-center gap-3"
-            >
-              <FriMark />
-              <div className="text-left">
-                <p className="font-mono text-xs tracking-widest text-accent">FRI</p>
-                <h1 className="text-sm font-medium tracking-tight sm:text-base">
-                  Flop Reputation Index
-                </h1>
-              </div>
-            </button>
-            <form onSubmit={handleLookup} className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-faint" />
-              <input
-                value={lookupInput}
-                onChange={(e) => setLookupInput(e.target.value)}
-                placeholder="Lookup did:key:..."
-                className="h-8 w-48 rounded-md border border-border bg-elevated pl-8 pr-2 text-xs text-fg placeholder:text-faint focus:border-accent focus:ring-1 focus:ring-accent/30 focus:outline-none sm:w-64"
-              />
-            </form>
-          </div>
-        </nav>
+        <NavBar
+          activeTab="reputation"
+          lookupInput={lookupInput}
+          onLookupChange={setLookupInput}
+          onSubmitLookup={handleLookup}
+          onLogoClick={() => switchTab("reputation")}
+          onTabClick={switchTab}
+          counts={{
+            dids: dids.total_dids,
+            kibble: kibble.total_jobs,
+            tclk: tclk.total_contracts,
+            reputation: reputation.total_dids_scored,
+          }}
+        />
         <LiveTicker />
         <DidProfilePage
           did={view.did}
@@ -196,51 +192,20 @@ export function App() {
   const tab = view.tab;
   return (
     <>
-      <nav className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/75">
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-2 sm:px-6">
-          <div className="flex items-center gap-3">
-            <FriMark />
-            <div>
-              <p className="font-mono text-xs tracking-widest text-accent">FRI</p>
-              <h1 className="text-sm font-medium tracking-tight sm:text-base">
-                Flop Reputation Index
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <form onSubmit={handleLookup} className="relative hidden sm:block">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-faint" />
-              <input
-                value={lookupInput}
-                onChange={(e) => setLookupInput(e.target.value)}
-                placeholder="Lookup did:key:..."
-                className="h-8 w-48 rounded-md border border-border bg-elevated pl-8 pr-2 text-xs text-fg placeholder:text-faint focus:border-accent focus:ring-1 focus:ring-accent/30 focus:outline-none"
-              />
-            </form>
-            <div className="flex items-center gap-1 overflow-x-auto rounded-lg border border-border bg-elevated p-1">
-              <TabButton active={tab === "rooms"} onClick={() => switchTab("rooms")}>
-                Rooms
-              </TabButton>
-              <TabButton active={tab === "dids"} onClick={() => switchTab("dids")}>
-                DIDs
-                <CountBadge value={dids.total_dids} />
-              </TabButton>
-              <TabButton active={tab === "kibble"} onClick={() => switchTab("kibble")}>
-                Kibble
-                <CountBadge value={kibble.total_jobs} />
-              </TabButton>
-              <TabButton active={tab === "tclk"} onClick={() => switchTab("tclk")}>
-                TCLK
-                <CountBadge value={tclk.total_contracts} />
-              </TabButton>
-              <TabButton active={tab === "reputation"} onClick={() => switchTab("reputation")}>
-                Reputation
-                <CountBadge value={reputation.total_dids_scored} />
-              </TabButton>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <NavBar
+        activeTab={tab}
+        lookupInput={lookupInput}
+        onLookupChange={setLookupInput}
+        onSubmitLookup={handleLookup}
+        onLogoClick={() => switchTab("rooms")}
+        onTabClick={switchTab}
+        counts={{
+          dids: dids.total_dids,
+          kibble: kibble.total_jobs,
+          tclk: tclk.total_contracts,
+          reputation: reputation.total_dids_scored,
+        }}
+      />
 
       <LiveTicker />
       {tab === "rooms" ? (
@@ -258,35 +223,123 @@ export function App() {
   );
 }
 
+function NavBar({
+  activeTab,
+  lookupInput,
+  onLookupChange,
+  onSubmitLookup,
+  onLogoClick,
+  onTabClick,
+  counts,
+}: {
+  activeTab: Tab;
+  lookupInput: string;
+  onLookupChange: (v: string) => void;
+  onSubmitLookup: (e: React.FormEvent) => void;
+  onLogoClick: () => void;
+  onTabClick: (tab: Tab) => void;
+  counts: { dids: number; kibble: number; tclk: number; reputation: number };
+}) {
+  return (
+    <nav className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/80">
+      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+        <button
+          type="button"
+          onClick={onLogoClick}
+          className="group flex items-center gap-2.5"
+          aria-label="FRI — Flop Reputation Index"
+        >
+          <FriMark />
+          <div className="text-left leading-tight">
+            <p className="font-mono text-sm font-bold tracking-[0.18em] text-accent">
+              FRI
+            </p>
+            <h1 className="font-mono text-[11px] tracking-wide text-muted">
+              flop reputation index
+            </h1>
+          </div>
+        </button>
+
+        <div className="flex items-center gap-2">
+          <form onSubmit={onSubmitLookup} className="relative hidden sm:block">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-faint" />
+            <input
+              value={lookupInput}
+              onChange={(e) => onLookupChange(e.target.value)}
+              placeholder="Lookup did:key:…"
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="Lookup DID"
+              className="h-8 w-56 rounded border border-border bg-surface pl-8 pr-2 font-mono text-xs text-fg placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40 lg:w-72"
+            />
+          </form>
+          <div
+            className="flex items-center gap-0 overflow-x-auto rounded border border-border bg-surface"
+            role="tablist"
+            aria-label="Sections"
+          >
+            {TABS.map((t) => (
+              <TabButton
+                key={t.id}
+                active={activeTab === t.id}
+                onClick={() => onTabClick(t.id)}
+                label={t.label}
+                count={
+                  t.id === "dids"
+                    ? counts.dids
+                    : t.id === "kibble"
+                      ? counts.kibble
+                      : t.id === "tclk"
+                        ? counts.tclk
+                        : t.id === "reputation"
+                          ? counts.reputation
+                          : null
+                }
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
 function TabButton({
   active,
   onClick,
-  children,
+  label,
+  count,
 }: {
   active: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  label: string;
+  count: number | null;
 }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-8 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors",
-        active ? "bg-accent text-white" : "text-muted hover:text-fg",
+        "inline-flex h-8 shrink-0 items-center gap-1.5 border-b-2 px-3 font-mono text-xs tracking-wide transition-colors",
+        active
+          ? "border-accent text-accent"
+          : "border-transparent text-muted hover:text-fg",
       )}
     >
-      {children}
+      {label}
+      {count != null ? <CountBadge value={count} active={active} /> : null}
     </button>
   );
 }
 
-function CountBadge({ value }: { value: number }) {
+function CountBadge({ value, active }: { value: number; active: boolean }) {
   return (
     <span
       className={cn(
-        "ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
-        "bg-bg/70 text-muted",
+        "inline-flex min-w-5 items-center justify-center rounded px-1 font-mono text-[10px] tabular-nums",
+        active ? "bg-accent/15 text-accent" : "bg-elevated text-faint",
       )}
     >
       {value.toLocaleString()}
