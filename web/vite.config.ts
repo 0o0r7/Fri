@@ -18,6 +18,10 @@ export default defineConfig({
     port: 5173,
     fs: { strict: false },
     proxy: {
+      "/api": {
+        target: "http://backend:8000",
+        changeOrigin: true,
+      },
       "/tc": {
         target: "https://technocore.chat",
         changeOrigin: true,

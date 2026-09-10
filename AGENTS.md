@@ -2,32 +2,79 @@
 
 ## What this is
 
-A read-only reputation dashboard for the "Flop agent economy." Frontend-only Vite + React 19 + TS + Tailwind v4 app. There is **no runtime backend** — all data is committed JSON served as static files.
+A read-only reputation dashboard for the "Flop agent economy." Now a **real-time** application: a Python/FastAPI backend continuously long-polls technocore.chat and pushes live updates to a React frontend via SSE.
 
-## Architecture
+## Architecture (Live)
 
-- `web/` — Vite dev server (port 5173). The entire user-facing app.
-- `web/public/data/*.json` — committed collector output served at `/data/*`. The frontend `fetch()`es these on mount (`latest.json`, `dids.json`, `kibble.json`, `tclk.json`, `reputation.json`).
-- `data/` — the canonical collector output at repo root. `scripts/sync_data.sh` copies it into `web/public/data/` so Vite serves it. The repo ships with both already in sync.
-- `collector/` — Python scoring engine that fetches from technocore.chat and writes `data/*.json`. **Not needed to run the dashboard**; it's a cron job (`/.github/workflows/update.yml`), not a runtime dependency.
-- Live ticker (`web/src/hooks/useLiveFeed.ts`) polls `technocore.chat` via the Vite `/tc` proxy (configured in `vite.config.ts`). This is a public API with **no credentials**. If it fails (network/proxy), the ticker shows an error but the rest of the dashboard works fine.
+```
+technocore.chat  ←──long-poll (wait=10)──→  FRI Backend (FastAPI)
+                                            ├── collector loop (asyncio + httpx)
+                                            │   ├── long-poll 24 rooms
+                                            │   ├── /rooms fetch every 60s
+                                            │   ├── snapshot indices every 30s
+                                            │   └── publish events to Redis pub/sub
+                                            ├── Redis (cache + pub/sub)
+                                            └── SSE endpoint (/api/live)
+                                                    ↓
+                                            React frontend (EventSource)
+                                            ├── live counters (DIDs, jobs, deals)
+                                            ├── live message ticker
+                                            └── auto-updating snapshots
+```
 
-## Running here (docker-compose.base44.yml)
+### Services (docker-compose.base44.yml)
 
-Single `web` service: `node:22` image, repo bind-mounted at `/app`, runs `npm install && npm run dev` in `web/`. Host port 3000 → container 5173.
+| Service | Image | Port | Role |
+|---|---|---|---|
+| `web` | node:22 | 3000→5173 | Vite + React frontend, proxies /api to backend |
+| `backend` | python:3.12-slim | 8000 (internal) | FastAPI + async collector loop |
+| `redis` | redis:7-alpine | 6379 (internal) | Cache JSON snapshots + pub/sub fan-out |
 
-No secrets, no env vars beyond `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` (platform-provided, for Vite allowed-hosts).
+### Backend (`backend/`)
+
+- `app.py` — FastAPI app: REST endpoints (`/api/*` return cached snapshots from Redis) + SSE (`/api/live` multiplexed event stream)
+- `collector.py` — async collector loop: long-polls rooms with `wait=10`, feeds messages to existing scoring modules, snapshots to Redis, publishes events
+- `store.py` — Redis wrapper for JSON caching + pub/sub
+
+The collector reuses existing modules (`collector/did_index.py`, `kibble.py`, `tclk.py`, `reputation.py`, `score.py`) — only orchestration changed from batch to continuous async. The `did_index.py` has a fallback `did_note_fingerprint` (sha256[:16]) when flopkit is not installed, so the backend doesn't need the flopkit git dependency.
+
+### Frontend changes
+
+- `web/src/hooks/useLiveData.ts` — SSE hook: fetches initial snapshots from `/api/*`, opens EventSource to `/api/live`, updates state on each event
+- `web/src/app.tsx` — uses `useLiveData()` instead of static `fetch()`; passes `liveMessages` + `connected` to `LiveTicker`
+- `web/src/components/live-ticker.tsx` — uses SSE messages from backend instead of direct technocore polling
+- `web/vite.config.ts` — added `/api` proxy to `http://backend:8000`
+
+### SSE event types
+
+Single `/api/live` endpoint, events typed by `event:` field:
+- `counts` — counter deltas (total_dids, total_rooms, total_jobs, total_contracts)
+- `feed` — new message from a monitored room
+- `rooms` / `dids` / `kibble` / `tclk` / `reputation` — snapshot updates
+- `health` — technocore connectivity status + stale flag
+
+### Graceful degradation
+
+If technocore is unreachable, the backend serves last cached data from Redis with a `stale` flag. The collector loop retries with exponential backoff and resumes automatically on reconnect.
 
 ## Verifying it works
 
-- `curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/` → 200
-- `curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/data/latest.json` → 200
-- `/src/main.tsx` returns 200 (confirms live source, not a prebuilt bundle).
-- In the preview, `#root` has children and `nav` renders 5 tabs with counts.
+- `curl -s http://localhost:3000/api/health` → `{"status":"ok","stale":false,...}`
+- `curl -s http://localhost:3000/api/counts` → live counter values
+- In the preview, tab counts grow in real-time (DIDs increase every few seconds)
+- The LIVE badge in the ticker is green; messages stream in the ticker bar
 
 ## Editing notes
 
-- Frontend edits hot-reload via Vite HMR — no restart needed.
-- Tailwind v4 via `@tailwindcss/vite` plugin; theme tokens defined in `web/src/styles.css` (`@theme` block).
-- Path alias `@` → `web/src` (vite.config.ts + tsconfig).
-- The Python collector and its `flopkit` git dependency are NOT installed in the compose setup; if a change requires running the collector, do it ad-hoc in a throwaway container.
+- Backend edits hot-reload via `uvicorn --reload`
+- Frontend edits hot-reload via Vite HMR
+- The Python collector and its `flopkit` git dependency are NOT needed for the live backend — it uses a standalone fingerprint fallback
+- The committed `data/*.json` files serve as the initial Redis seed (instant frontend display on boot); live data replaces them within ~30s
+- Tailwind v4 via `@tailwindcss/vite` plugin; theme tokens in `web/src/styles.css`
+- Path alias `@` → `web/src` (vite.config.ts + tsconfig)
+
+## Phase 2 roadmap
+
+- Full UI redesign informed by FLOP ecosystem design DNA (flop.finance, gpus.flop.finance, technocore.chat/humans)
+- Visual hierarchy for high-volume real-time data
+- Restful color palette, intuitive navigation, polished first-impression aesthetic

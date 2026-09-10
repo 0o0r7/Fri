@@ -11,6 +11,7 @@ import { LiveTicker } from "@/components/live-ticker";
 import { FriMark } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import { didFromHash, didToHash } from "@/lib/did-profile";
+import { useLiveData } from "@/hooks/useLiveData";
 import type {
   DidIndex,
   Feed,
@@ -18,12 +19,6 @@ import type {
   ReputationIndex,
   TclkIndex,
 } from "@/lib/types";
-
-const JSON_PATH = "/data/latest.json";
-const DIDS_PATH = "/data/dids.json";
-const KIBBLE_PATH = "/data/kibble.json";
-const TCLK_PATH = "/data/tclk.json";
-const REPUTATION_PATH = "/data/reputation.json";
 
 type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation";
 
@@ -50,61 +45,28 @@ function viewFromHash(): View | null {
   if (lower.startsWith("#kibble")) return { kind: "tab", tab: "kibble" };
   if (lower.startsWith("#tclk")) return { kind: "tab", tab: "tclk" };
   if (lower.startsWith("#reputation")) return { kind: "tab", tab: "reputation" };
-  // Unknown hash (e.g., #gpu-miners, #did:key:..., #k12345...) — don't change the view.
-  // This prevents page-component hash updates from fighting with tab switching.
   return null;
 }
 
 export function App() {
-  const [feed, setFeed] = useState<Feed | null>(null);
-  const [dids, setDids] = useState<DidIndex | null>(null);
-  const [kibble, setKibble] = useState<KibbleIndex | null>(null);
-  const [tclk, setTclk] = useState<TclkIndex | null>(null);
-  const [reputation, setReputation] = useState<ReputationIndex | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>(() => viewFromHash() ?? { kind: "tab", tab: "rooms" });
-  const [lookupInput, setLookupInput] = useState("");
+  const {
+    feed,
+    dids,
+    kibble,
+    tclk,
+    reputation,
+    counts,
+    liveMessages,
+    connected,
+    stale,
+    lastUpdate,
+    error,
+  } = useLiveData();
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      fetch(JSON_PATH).then((r) => {
-        if (!r.ok) throw new Error(`rooms HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(DIDS_PATH).then((r) => {
-        if (!r.ok) throw new Error(`dids HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(KIBBLE_PATH).then((r) => {
-        if (!r.ok) throw new Error(`kibble HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(TCLK_PATH).then((r) => {
-        if (!r.ok) throw new Error(`tclk HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(REPUTATION_PATH).then((r) => {
-        if (!r.ok) throw new Error(`reputation HTTP ${r.status}`);
-        return r.json();
-      }),
-    ])
-      .then(([f, d, k, t, r]: [Feed, DidIndex, KibbleIndex, TclkIndex, ReputationIndex]) => {
-        if (!cancelled) {
-          setFeed(f);
-          setDids(d);
-          setKibble(k);
-          setTclk(t);
-          setReputation(r);
-        }
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setError(e.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const [view, setView] = useState<View>(
+    () => viewFromHash() ?? { kind: "tab", tab: "rooms" },
+  );
+  const [lookupInput, setLookupInput] = useState("");
 
   useEffect(() => {
     function onHash() {
@@ -122,7 +84,6 @@ export function App() {
 
   function navigateToDid(did: string) {
     if (!did) {
-      // Empty DID = go back to reputation tab
       switchTab("reputation");
       return;
     }
@@ -139,16 +100,14 @@ export function App() {
     }
   }
 
-  if (error) {
+  if (error && !feed) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="font-mono text-sm text-low">Could not load feed</p>
+        <p className="font-mono text-sm text-low">Could not load live data</p>
         <p className="max-w-sm text-sm text-pretty text-muted">{error}</p>
         <p className="max-w-sm text-xs text-faint">
-          Run the collector:{" "}
-          <code className="font-mono text-muted">
-            python -m collector.main --once
-          </code>
+          The FRI backend is starting up — it fetches live data from technocore.chat.
+          This can take a minute on first boot.
         </p>
       </div>
     );
@@ -156,6 +115,13 @@ export function App() {
 
   if (!feed || !dids || !kibble || !tclk || !reputation)
     return <IndexPageSkeleton />;
+
+  const navCounts = {
+    dids: counts?.total_dids ?? dids.total_dids,
+    kibble: counts?.total_jobs ?? kibble.total_jobs,
+    tclk: counts?.total_contracts ?? tclk.total_contracts,
+    reputation: counts?.total_dids_scored ?? reputation.total_dids_scored,
+  };
 
   // DID profile view
   if (view.kind === "profile") {
@@ -168,14 +134,12 @@ export function App() {
           onSubmitLookup={handleLookup}
           onLogoClick={() => switchTab("reputation")}
           onTabClick={switchTab}
-          counts={{
-            dids: dids.total_dids,
-            kibble: kibble.total_jobs,
-            tclk: tclk.total_contracts,
-            reputation: reputation.total_dids_scored,
-          }}
+          counts={navCounts}
+          connected={connected}
+          stale={stale}
+          lastUpdate={lastUpdate}
         />
-        <LiveTicker />
+        <LiveTicker messages={liveMessages} connected={connected} />
         <DidProfilePage
           did={view.did}
           didIndex={dids}
@@ -199,15 +163,13 @@ export function App() {
         onSubmitLookup={handleLookup}
         onLogoClick={() => switchTab("rooms")}
         onTabClick={switchTab}
-        counts={{
-          dids: dids.total_dids,
-          kibble: kibble.total_jobs,
-          tclk: tclk.total_contracts,
-          reputation: reputation.total_dids_scored,
-        }}
+        counts={navCounts}
+        connected={connected}
+        stale={stale}
+        lastUpdate={lastUpdate}
       />
 
-      <LiveTicker />
+      <LiveTicker messages={liveMessages} connected={connected} />
       {tab === "rooms" ? (
         <IndexPage feed={feed} />
       ) : tab === "dids" ? (
@@ -231,6 +193,9 @@ function NavBar({
   onLogoClick,
   onTabClick,
   counts,
+  connected,
+  stale,
+  lastUpdate,
 }: {
   activeTab: Tab;
   lookupInput: string;
@@ -239,6 +204,9 @@ function NavBar({
   onLogoClick: () => void;
   onTabClick: (tab: Tab) => void;
   counts: { dids: number; kibble: number; tclk: number; reputation: number };
+  connected: boolean;
+  stale: boolean;
+  lastUpdate: number;
 }) {
   return (
     <nav className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/80">
