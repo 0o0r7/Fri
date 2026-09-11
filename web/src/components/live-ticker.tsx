@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useLiveFeed, type TcMessage } from "@/hooks/useLiveFeed";
 import { tinyDid } from "@/lib/format";
+import type { LiveMessage } from "@/hooks/useLiveData";
 
-type Source = "events" | "tclk" | "kibble";
+type Source = "events" | "tclk" | "kibble" | "other";
 
 type TickerItem = {
   id: string;
   source: Source;
+  room: string;
   seq: number;
   ts: string;
   from: string;
@@ -20,13 +21,18 @@ const SOURCE_CONFIG: Record<
   Source,
   { label: string; color: string; tag: string }
 > = {
-  // FLOP Cyan for room events — primary signal
   events: { label: "ROOM", color: "text-accent", tag: "ROOM" },
-  // Electric Green for TCLK deals — verified/positive
   tclk: { label: "TCLK", color: "text-good", tag: "TCLK" },
-  // Amber for Kibble work
   kibble: { label: "WORK", color: "text-mid", tag: "WORK" },
+  other: { label: "MSG", color: "text-muted", tag: "MSG" },
 };
+
+function classifySource(room: string): Source {
+  if (room === "events") return "events";
+  if (room.includes("tclk")) return "tclk";
+  if (room === "kibble") return "kibble";
+  return "other";
+}
 
 function classifyText(source: Source, text: string): { label: string; color: string } {
   if (source === "events") {
@@ -75,15 +81,17 @@ function classifyText(source: Source, text: string): { label: string; color: str
   return { label: text.slice(0, 40), color: "text-muted" };
 }
 
-function toTickerItem(msg: TcMessage, source: Source): TickerItem | null {
+function toTickerItem(msg: LiveMessage): TickerItem | null {
   if (!msg.seq || !msg.text) return null;
+  const source = classifySource(msg.room);
   const { label, color } = classifyText(source, msg.text);
   return {
-    id: `${source}-${msg.seq}`,
+    id: `${msg.room}-${msg.seq}`,
     source,
+    room: msg.room,
     seq: msg.seq,
-    ts: msg.ts ?? "",
-    from: msg.from ?? "",
+    ts: msg.ts,
+    from: msg.from,
     text: msg.text,
     label,
     color,
@@ -92,32 +100,20 @@ function toTickerItem(msg: TcMessage, source: Source): TickerItem | null {
 
 const MAX_ITEMS = 50;
 
-export function LiveTicker() {
-  const eventsFeed = useLiveFeed("events");
-  const tclkFeed = useLiveFeed("tclk-offers");
-  const kibbleFeed = useLiveFeed("kibble");
-
+export function LiveTicker({
+  messages,
+  connected,
+}: {
+  messages: LiveMessage[];
+  connected: boolean;
+}) {
   const [items, setItems] = useState<TickerItem[]>([]);
   const seenIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const allNew: TickerItem[] = [];
-    for (const m of eventsFeed.messages) {
-      const item = toTickerItem(m, "events");
-      if (item && !seenIds.current.has(item.id)) {
-        seenIds.current.add(item.id);
-        allNew.push(item);
-      }
-    }
-    for (const m of tclkFeed.messages) {
-      const item = toTickerItem(m, "tclk");
-      if (item && !seenIds.current.has(item.id)) {
-        seenIds.current.add(item.id);
-        allNew.push(item);
-      }
-    }
-    for (const m of kibbleFeed.messages) {
-      const item = toTickerItem(m, "kibble");
+    for (const m of messages) {
+      const item = toTickerItem(m);
       if (item && !seenIds.current.has(item.id)) {
         seenIds.current.add(item.id);
         allNew.push(item);
@@ -128,29 +124,32 @@ export function LiveTicker() {
         if (a.ts && b.ts) return a.ts.localeCompare(b.ts);
         return a.seq - b.seq;
       });
-      setItems((prev) => {
-        const next = [...allNew.reverse(), ...prev].slice(0, MAX_ITEMS);
-        return next;
-      });
+      setItems((prev) => [...allNew.reverse(), ...prev].slice(0, MAX_ITEMS));
     }
-  }, [eventsFeed.messages, tclkFeed.messages, kibbleFeed.messages]);
-
-  const connected = eventsFeed.connected || tclkFeed.connected || kibbleFeed.connected;
-  const error = eventsFeed.error ?? tclkFeed.error ?? kibbleFeed.error;
-
-  const counters = useMemo(() => {
-    return {
-      rooms: eventsFeed.messagesPerMin,
-      deals: tclkFeed.messagesPerMin,
-      jobs: kibbleFeed.messagesPerMin,
-    };
-  }, [eventsFeed.messagesPerMin, tclkFeed.messagesPerMin, kibbleFeed.messagesPerMin]);
+  }, [messages]);
 
   useEffect(() => {
     if (seenIds.current.size > 500) {
       const keep = new Set(items.map((i) => i.id));
       seenIds.current = keep;
     }
+  }, [items]);
+
+  // Counters from recent items
+  const counters = useMemo(() => {
+    const now = Date.now();
+    const recent = items.filter((i) => {
+      try {
+        return now - new Date(i.ts).getTime() < 60000;
+      } catch {
+        return false;
+      }
+    });
+    return {
+      rooms: recent.filter((i) => i.source === "events").length,
+      deals: recent.filter((i) => i.source === "tclk").length,
+      jobs: recent.filter((i) => i.source === "kibble").length,
+    };
   }, [items]);
 
   return (
@@ -163,7 +162,7 @@ export function LiveTicker() {
               "relative flex size-2",
               connected ? "text-good" : "text-low",
             )}
-            title={error ?? (connected ? "Live" : "Disconnected")}
+            title={connected ? "Live" : "Disconnected"}
           >
             <span
               className={cn(
@@ -201,7 +200,7 @@ export function LiveTicker() {
             <div className="flex h-full items-center font-mono text-[11px] text-faint">
               {connected
                 ? "Listening for activity…"
-                : error ?? "Connecting…"}
+                : "Connecting to live feed…"}
             </div>
           ) : (
             <div className="flex h-full items-center gap-2 overflow-x-auto pb-0.5">

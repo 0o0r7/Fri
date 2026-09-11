@@ -1,4 +1,4 @@
-import { ArrowUpRight, Copy, Check, Search } from "lucide-react";
+import { ArrowUpRight, Copy, Check, Search, Bookmark, BookmarkCheck } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -32,6 +32,8 @@ export function DidProfilePage({
   tclkIndex,
   reputationIndex,
   onNavigateDid,
+  isWatched,
+  onToggleWatch,
 }: {
   did: string;
   didIndex: DidIndex;
@@ -39,6 +41,8 @@ export function DidProfilePage({
   tclkIndex: TclkIndex;
   reputationIndex: ReputationIndex;
   onNavigateDid: (did: string) => void;
+  isWatched: boolean;
+  onToggleWatch: () => void;
 }) {
   const [copied, setCopied] = useState<"did" | "fp" | null>(null);
   const profile = buildDidProfile(
@@ -134,6 +138,19 @@ export function DidProfilePage({
                 <ArrowUpRight className="size-3.5" />
               </a>
             ) : null}
+            <button
+              type="button"
+              onClick={onToggleWatch}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors",
+                isWatched
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-border bg-elevated text-fg hover:bg-elevated/70",
+              )}
+            >
+              {isWatched ? <BookmarkCheck className="size-3.5" /> : <Bookmark className="size-3.5" />}
+              {isWatched ? "Watching" : "Watch"}
+            </button>
             <button
               type="button"
               onClick={() => copy(did, "did")}

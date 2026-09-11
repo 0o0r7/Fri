@@ -40,7 +40,15 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from flopkit.technocore import did_note_fingerprint
+try:
+    from flopkit.technocore import did_note_fingerprint
+except ImportError:
+    # Fallback for environments without flopkit (e.g., FRI live backend).
+    # Same algorithm: first 16 hex chars of SHA-256 of the DID string.
+    import hashlib
+
+    def did_note_fingerprint(did: str) -> str:
+        return hashlib.sha256(did.encode()).hexdigest()[:16]
 
 
 # ---------------------------------------------------------------------------

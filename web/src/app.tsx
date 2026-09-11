@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Bookmark } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { IndexPage } from "@/components/index-page";
 import { DidsPage } from "@/components/dids-page";
 import { KibblePage } from "@/components/kibble-page";
@@ -9,8 +10,24 @@ import { DidProfilePage } from "@/components/did-profile-page";
 import { IndexPageSkeleton } from "@/components/skeleton";
 import { LiveTicker } from "@/components/live-ticker";
 import { FriMark } from "@/components/logo";
+import { HeroSection } from "@/components/hero-section";
+import { MobileNav } from "@/components/mobile-nav";
+import { SiteFooter } from "@/components/site-footer";
+import { LanguageSelector } from "@/components/language-selector";
+import { AboutPage } from "@/components/pages/about-page";
+import { HowItWorksPage } from "@/components/pages/how-it-works-page";
+import { DocsPage } from "@/components/pages/docs-page";
+import { PrivacyPage } from "@/components/pages/privacy-page";
+import { TermsPage } from "@/components/pages/terms-page";
+import { FaqPage } from "@/components/pages/faq-page";
+import { NetworkGraph } from "@/components/network-graph";
+import { WatchlistPage } from "@/components/watchlist-page";
+import { SdkGuidePage } from "@/components/sdk-guide-page";
+import { EcosystemHealth } from "@/components/ecosystem-health";
 import { cn } from "@/lib/utils";
 import { didFromHash, didToHash } from "@/lib/did-profile";
+import { useLiveData } from "@/hooks/useLiveData";
+import { useWatchlist } from "@/hooks/useWatchlist";
 import type {
   DidIndex,
   Feed,
@@ -19,25 +36,34 @@ import type {
   TclkIndex,
 } from "@/lib/types";
 
-const JSON_PATH = "/data/latest.json";
-const DIDS_PATH = "/data/dids.json";
-const KIBBLE_PATH = "/data/kibble.json";
-const TCLK_PATH = "/data/tclk.json";
-const REPUTATION_PATH = "/data/reputation.json";
-
-type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation";
+type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation" | "network" | "health" | "sdk-guide";
+type PageInfo = "about" | "how-it-works" | "docs" | "privacy" | "terms" | "faq";
 
 type View =
   | { kind: "tab"; tab: Tab }
-  | { kind: "profile"; did: string };
+  | { kind: "profile"; did: string }
+  | { kind: "page"; page: PageInfo }
+  | { kind: "watchlist" };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "rooms", label: "Rooms" },
-  { id: "dids", label: "DIDs" },
-  { id: "kibble", label: "Kibble" },
-  { id: "tclk", label: "TCLK" },
-  { id: "reputation", label: "Reputation" },
+const TABS: { id: Tab; labelKey: string }[] = [
+  { id: "rooms", labelKey: "nav.rooms" },
+  { id: "dids", labelKey: "nav.dids" },
+  { id: "kibble", labelKey: "nav.kibble" },
+  { id: "tclk", labelKey: "nav.tclk" },
+  { id: "reputation", labelKey: "nav.reputation" },
+  { id: "network", labelKey: "nav.network" },
+  { id: "health", labelKey: "nav.health" },
+  { id: "sdk-guide", labelKey: "nav.sdkGuide" },
 ];
+
+const INFO_PAGES: Record<string, PageInfo> = {
+  "#about": "about",
+  "#how-it-works": "how-it-works",
+  "#docs": "docs",
+  "#privacy": "privacy",
+  "#terms": "terms",
+  "#faq": "faq",
+};
 
 function viewFromHash(): View | null {
   if (typeof window === "undefined") return { kind: "tab", tab: "rooms" };
@@ -50,61 +76,36 @@ function viewFromHash(): View | null {
   if (lower.startsWith("#kibble")) return { kind: "tab", tab: "kibble" };
   if (lower.startsWith("#tclk")) return { kind: "tab", tab: "tclk" };
   if (lower.startsWith("#reputation")) return { kind: "tab", tab: "reputation" };
-  // Unknown hash (e.g., #gpu-miners, #did:key:..., #k12345...) — don't change the view.
-  // This prevents page-component hash updates from fighting with tab switching.
+  if (lower.startsWith("#network")) return { kind: "tab", tab: "network" };
+  if (lower.startsWith("#health")) return { kind: "tab", tab: "health" };
+  if (lower.startsWith("#sdk-guide")) return { kind: "tab", tab: "sdk-guide" };
+  if (lower.startsWith("#watchlist")) return { kind: "watchlist" };
+  if (INFO_PAGES[lower]) return { kind: "page", page: INFO_PAGES[lower] };
   return null;
 }
 
 export function App() {
-  const [feed, setFeed] = useState<Feed | null>(null);
-  const [dids, setDids] = useState<DidIndex | null>(null);
-  const [kibble, setKibble] = useState<KibbleIndex | null>(null);
-  const [tclk, setTclk] = useState<TclkIndex | null>(null);
-  const [reputation, setReputation] = useState<ReputationIndex | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>(() => viewFromHash() ?? { kind: "tab", tab: "rooms" });
-  const [lookupInput, setLookupInput] = useState("");
+  const { t } = useTranslation();
+  const {
+    feed,
+    dids,
+    kibble,
+    tclk,
+    reputation,
+    counts,
+    health,
+    liveMessages,
+    connected,
+    stale,
+    lastUpdate,
+    error,
+  } = useLiveData();
+  const watchlist = useWatchlist();
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      fetch(JSON_PATH).then((r) => {
-        if (!r.ok) throw new Error(`rooms HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(DIDS_PATH).then((r) => {
-        if (!r.ok) throw new Error(`dids HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(KIBBLE_PATH).then((r) => {
-        if (!r.ok) throw new Error(`kibble HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(TCLK_PATH).then((r) => {
-        if (!r.ok) throw new Error(`tclk HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(REPUTATION_PATH).then((r) => {
-        if (!r.ok) throw new Error(`reputation HTTP ${r.status}`);
-        return r.json();
-      }),
-    ])
-      .then(([f, d, k, t, r]: [Feed, DidIndex, KibbleIndex, TclkIndex, ReputationIndex]) => {
-        if (!cancelled) {
-          setFeed(f);
-          setDids(d);
-          setKibble(k);
-          setTclk(t);
-          setReputation(r);
-        }
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setError(e.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const [view, setView] = useState<View>(
+    () => viewFromHash() ?? { kind: "tab", tab: "rooms" },
+  );
+  const [lookupInput, setLookupInput] = useState("");
 
   useEffect(() => {
     function onHash() {
@@ -122,12 +123,16 @@ export function App() {
 
   function navigateToDid(did: string) {
     if (!did) {
-      // Empty DID = go back to reputation tab
       switchTab("reputation");
       return;
     }
     window.location.hash = didToHash(did);
     setView({ kind: "profile", did });
+  }
+
+  function navigateToWatchlist() {
+    window.location.hash = "#watchlist";
+    setView({ kind: "watchlist" });
   }
 
   function handleLookup(e: React.FormEvent) {
@@ -139,16 +144,53 @@ export function App() {
     }
   }
 
-  if (error) {
+  // Info pages — render immediately, no live data needed
+  if (view.kind === "page") {
+    const navCounts = {
+      dids: counts?.total_dids ?? dids?.total_dids ?? 0,
+      kibble: counts?.total_jobs ?? kibble?.total_jobs ?? 0,
+      tclk: counts?.total_contracts ?? tclk?.total_contracts ?? 0,
+      reputation: counts?.total_dids_scored ?? reputation?.total_dids_scored ?? 0,
+    };
+    const pageMap: Record<PageInfo, React.ReactNode> = {
+      about: <AboutPage />,
+      "how-it-works": <HowItWorksPage />,
+      docs: <DocsPage />,
+      privacy: <PrivacyPage />,
+      terms: <TermsPage />,
+      faq: <FaqPage />,
+    };
+    return (
+      <>
+        <NavBar
+          activeTab={null}
+          lookupInput={lookupInput}
+          onLookupChange={setLookupInput}
+          onSubmitLookup={handleLookup}
+          onLogoClick={() => switchTab("rooms")}
+          onTabClick={switchTab}
+          counts={navCounts}
+          watchlistCount={watchlist.count}
+          onWatchlistClick={navigateToWatchlist}
+          connected={connected}
+          stale={stale}
+          lastUpdate={lastUpdate}
+          t={t}
+        />
+        {pageMap[view.page]}
+        <SiteFooter />
+      </>
+    );
+  }
+
+  if (error && !feed) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="font-mono text-sm text-low">Could not load feed</p>
+        <p className="font-mono text-sm text-low">Could not load live data</p>
         <p className="max-w-sm text-sm text-pretty text-muted">{error}</p>
         <p className="max-w-sm text-xs text-faint">
-          Run the collector:{" "}
-          <code className="font-mono text-muted">
-            python -m collector.main --once
-          </code>
+          The FRI backend is starting up — it fetches live data from technocore.chat.
+          This can take a minute on first boot.
         </p>
       </div>
     );
@@ -156,6 +198,13 @@ export function App() {
 
   if (!feed || !dids || !kibble || !tclk || !reputation)
     return <IndexPageSkeleton />;
+
+  const navCounts = {
+    dids: counts?.total_dids ?? dids.total_dids,
+    kibble: counts?.total_jobs ?? kibble.total_jobs,
+    tclk: counts?.total_contracts ?? tclk.total_contracts,
+    reputation: counts?.total_dids_scored ?? reputation.total_dids_scored,
+  };
 
   // DID profile view
   if (view.kind === "profile") {
@@ -168,14 +217,15 @@ export function App() {
           onSubmitLookup={handleLookup}
           onLogoClick={() => switchTab("reputation")}
           onTabClick={switchTab}
-          counts={{
-            dids: dids.total_dids,
-            kibble: kibble.total_jobs,
-            tclk: tclk.total_contracts,
-            reputation: reputation.total_dids_scored,
-          }}
+          counts={navCounts}
+          watchlistCount={watchlist.count}
+          onWatchlistClick={navigateToWatchlist}
+          connected={connected}
+          stale={stale}
+          lastUpdate={lastUpdate}
+          t={t}
         />
-        <LiveTicker />
+        <LiveTicker messages={liveMessages} connected={connected} />
         <DidProfilePage
           did={view.did}
           didIndex={dids}
@@ -183,7 +233,45 @@ export function App() {
           tclkIndex={tclk}
           reputationIndex={reputation}
           onNavigateDid={navigateToDid}
+          isWatched={watchlist.has(view.did)}
+          onToggleWatch={() => watchlist.toggle(view.did)}
         />
+        <SiteFooter />
+      </>
+    );
+  }
+
+  // Watchlist view
+  if (view.kind === "watchlist") {
+    return (
+      <>
+        <NavBar
+          activeTab={null}
+          lookupInput={lookupInput}
+          onLookupChange={setLookupInput}
+          onSubmitLookup={handleLookup}
+          onLogoClick={() => switchTab("rooms")}
+          onTabClick={switchTab}
+          counts={navCounts}
+          watchlistCount={watchlist.count}
+          onWatchlistClick={navigateToWatchlist}
+          connected={connected}
+          stale={stale}
+          lastUpdate={lastUpdate}
+          t={t}
+        />
+        {dids ? (
+          <WatchlistPage
+            watchlist={watchlist.watchlist}
+            didIndex={dids}
+            reputationIndex={reputation}
+            onNavigateDid={navigateToDid}
+            onRemove={watchlist.remove}
+          />
+        ) : (
+          <IndexPageSkeleton />
+        )}
+        <SiteFooter />
       </>
     );
   }
@@ -199,26 +287,53 @@ export function App() {
         onSubmitLookup={handleLookup}
         onLogoClick={() => switchTab("rooms")}
         onTabClick={switchTab}
-        counts={{
-          dids: dids.total_dids,
-          kibble: kibble.total_jobs,
-          tclk: tclk.total_contracts,
-          reputation: reputation.total_dids_scored,
-        }}
+        counts={navCounts}
+        watchlistCount={watchlist.count}
+        onWatchlistClick={navigateToWatchlist}
+        connected={connected}
+        stale={stale}
+        lastUpdate={lastUpdate}
+        t={t}
       />
 
-      <LiveTicker />
-      {tab === "rooms" ? (
-        <IndexPage feed={feed} />
-      ) : tab === "dids" ? (
-        <DidsPage index={dids} />
-      ) : tab === "kibble" ? (
-        <KibblePage index={kibble} />
-      ) : tab === "tclk" ? (
-        <TclkPage index={tclk} />
-      ) : (
-        <ReputationPage index={reputation} />
-      )}
+      <LiveTicker messages={liveMessages} connected={connected} />
+      <div className="pb-14 lg:pb-0">
+        {tab === "rooms" ? (
+          <>
+            <HeroSection counts={counts} connected={connected} stale={stale} />
+            <IndexPage feed={feed} />
+          </>
+        ) : tab === "dids" ? (
+          <DidsPage index={dids} reputationIndex={reputation} />
+        ) : tab === "kibble" ? (
+          <KibblePage index={kibble} />
+        ) : tab === "tclk" ? (
+          <TclkPage index={tclk} />
+        ) : tab === "network" && dids ? (
+          <NetworkGraph
+            didIndex={dids}
+            reputationIndex={reputation}
+            onNavigateDid={navigateToDid}
+          />
+        ) : tab === "health" ? (
+          <EcosystemHealth
+            counts={counts}
+            health={health}
+            connected={connected}
+            stale={stale}
+          />
+        ) : tab === "sdk-guide" ? (
+          <SdkGuidePage />
+        ) : (
+          <ReputationPage index={reputation} />
+        )}
+      </div>
+      <SiteFooter />
+      <MobileNav
+        activeTab={tab}
+        onTabClick={switchTab}
+        counts={navCounts}
+      />
     </>
   );
 }
@@ -231,14 +346,26 @@ function NavBar({
   onLogoClick,
   onTabClick,
   counts,
+  watchlistCount,
+  onWatchlistClick,
+  connected,
+  stale,
+  lastUpdate,
+  t,
 }: {
-  activeTab: Tab;
+  activeTab: Tab | null;
   lookupInput: string;
   onLookupChange: (v: string) => void;
   onSubmitLookup: (e: React.FormEvent) => void;
   onLogoClick: () => void;
   onTabClick: (tab: Tab) => void;
   counts: { dids: number; kibble: number; tclk: number; reputation: number };
+  watchlistCount: number;
+  onWatchlistClick: () => void;
+  connected: boolean;
+  stale: boolean;
+  lastUpdate: number;
+  t: (key: string) => string;
 }) {
   return (
     <nav className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/80">
@@ -266,7 +393,7 @@ function NavBar({
             <input
               value={lookupInput}
               onChange={(e) => onLookupChange(e.target.value)}
-              placeholder="Lookup did:key:…"
+              placeholder={t("nav.lookupPlaceholder")}
               spellCheck={false}
               autoComplete="off"
               aria-label="Lookup DID"
@@ -274,30 +401,49 @@ function NavBar({
             />
           </form>
           <div
-            className="flex items-center gap-0 overflow-x-auto rounded border border-border bg-surface"
+            className="hidden items-center gap-0 overflow-x-auto rounded border border-border bg-surface lg:flex"
             role="tablist"
             aria-label="Sections"
           >
-            {TABS.map((t) => (
+            {TABS.map((tab) => (
               <TabButton
-                key={t.id}
-                active={activeTab === t.id}
-                onClick={() => onTabClick(t.id)}
-                label={t.label}
+                key={tab.id}
+                active={activeTab === tab.id}
+                onClick={() => onTabClick(tab.id)}
+                label={t(tab.labelKey)}
                 count={
-                  t.id === "dids"
+                  tab.id === "dids"
                     ? counts.dids
-                    : t.id === "kibble"
+                    : tab.id === "kibble"
                       ? counts.kibble
-                      : t.id === "tclk"
+                      : tab.id === "tclk"
                         ? counts.tclk
-                        : t.id === "reputation"
+                        : tab.id === "reputation"
                           ? counts.reputation
                           : null
                 }
               />
             ))}
+            <button
+              type="button"
+              onClick={onWatchlistClick}
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center gap-1.5 border-b-2 px-3 font-mono text-xs tracking-wide transition-colors",
+                activeTab === null
+                  ? "border-accent text-accent"
+                  : "border-transparent text-muted hover:text-fg",
+              )}
+              aria-label="Watchlist"
+            >
+              <Bookmark className="size-3.5" />
+              {watchlistCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded bg-accent/15 px-1 font-mono text-[10px] tabular-nums text-accent">
+                  {watchlistCount}
+                </span>
+              )}
+            </button>
           </div>
+          <LanguageSelector compact />
         </div>
       </div>
     </nav>

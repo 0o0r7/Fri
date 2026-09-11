@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DidRow } from "@/components/did-row";
+import { AgentCard } from "@/components/agent-card";
 import { DidDetail, DidEmptyDetail } from "@/components/did-detail";
 import {
   LoadMore,
@@ -9,30 +9,55 @@ import {
   StatBandItem,
   usePagination,
 } from "@/components/ui";
-import { filterDids, didIndexStats } from "@/lib/did-filter";
+import { filterDids, didIndexStats, type ReputationFilter, type ActivityFilter } from "@/lib/did-filter";
 import { absoluteTime, relativeTime } from "@/lib/format";
-import type { DidIndex, DidSortKey } from "@/lib/types";
+import { useWatchlist } from "@/hooks/useWatchlist";
+import type { DidIndex, DidSortKey, ReputationIndex } from "@/lib/types";
 
 const SORTS: { id: DidSortKey; label: string }[] = [
   { id: "messages", label: "Messages" },
+  { id: "reputation", label: "Reputation" },
   { id: "rooms", label: "Rooms" },
   { id: "recent", label: "Recent" },
   { id: "avg_len", label: "Avg len" },
 ];
 
+const REP_FILTERS: { id: ReputationFilter; label: string }[] = [
+  { id: "all", label: "Any" },
+  { id: "high", label: "High" },
+  { id: "mid", label: "Mid" },
+  { id: "low", label: "Low" },
+];
+
+const ACTIVITY_FILTERS: { id: ActivityFilter; label: string }[] = [
+  { id: "all", label: "Any" },
+  { id: "high", label: "100+" },
+  { id: "medium", label: "10-99" },
+  { id: "low", label: "<10" },
+];
+
 const PAGE_SIZE = 20;
 
-export function DidsPage({ index }: { index: DidIndex }) {
+export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputationIndex: ReputationIndex | null }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<DidSortKey>("messages");
+  const [repFilter, setRepFilter] = useState<ReputationFilter>("all");
+  const [actFilter, setActFilter] = useState<ActivityFilter>("all");
+  const [roomFilter, setRoomFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const watchlist = useWatchlist();
 
   const stats = useMemo(() => didIndexStats(index), [index]);
+  const repMap = useMemo(() => {
+    if (!reputationIndex) return new Map<string, ReputationIndex["dids"][number]>();
+    return new Map(reputationIndex.dids.map((d) => [d.did, d]));
+  }, [reputationIndex]);
+
   const dids = useMemo(
-    () => filterDids(index.dids, { query, sort }),
-    [index.dids, query, sort],
+    () => filterDids(index.dids, { query, sort, reputation: repFilter, activity: actFilter, room: roomFilter ?? undefined }, repMap),
+    [index.dids, query, sort, repFilter, actFilter, roomFilter, repMap],
   );
   const { visible, visibleCount, loadMore, total } = usePagination(dids, PAGE_SIZE);
 
@@ -143,19 +168,32 @@ export function DidsPage({ index }: { index: DidIndex }) {
               />
             </div>
             <FilterRow label="Sort" value={sort} options={SORTS} onChange={setSort} />
+            <FilterRow label="Rep" value={repFilter} options={REP_FILTERS} onChange={setRepFilter} />
+            <FilterRow label="Activity" value={actFilter} options={ACTIVITY_FILTERS} onChange={setActFilter} />
             {stats.top_rooms.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="mr-1 font-mono text-[10px] tracking-wider text-faint uppercase">
-                  Top rooms
+                  {roomFilter ? "Room" : "Top rooms"}
                 </span>
-                {stats.top_rooms.map((r) => (
-                  <span
+                {roomFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setRoomFilter(null)}
+                    className="inline-flex items-center gap-1 rounded border border-accent bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent"
+                  >
+                    ✕ {roomFilter}
+                  </button>
+                )}
+                {!roomFilter && stats.top_rooms.map((r) => (
+                  <button
                     key={r.room}
-                    className="inline-flex items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted"
+                    type="button"
+                    onClick={() => setRoomFilter(r.room)}
+                    className="inline-flex items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent hover:text-accent"
                   >
                     {r.room}
                     <span className="text-faint tabular-nums">{r.count}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
             ) : null}
@@ -174,20 +212,26 @@ export function DidsPage({ index }: { index: DidIndex }) {
                   onClick={() => {
                     setQuery("");
                     setSort("messages");
+                    setRepFilter("all");
+                    setActFilter("all");
+                    setRoomFilter(null);
                   }}
                 >
                   Reset
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-2 gap-2">
                 {visible.map((did, i) => (
-                  <DidRow
+                  <AgentCard
                     key={did.did}
                     did={did}
                     rank={i + 1}
+                    reputation={repMap.get(did.did)}
                     selected={selectedDid?.did === did.did}
                     onSelect={selectDid}
+                    isWatched={watchlist.has(did.did)}
+                    onToggleWatch={() => watchlist.toggle(did.did)}
                   />
                 ))}
                 <LoadMore
