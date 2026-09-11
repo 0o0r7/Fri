@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import logging
 import time
 from datetime import datetime, timezone
@@ -39,6 +40,26 @@ from .store import Store
 log = logging.getLogger("fri.collector")
 
 REDIS_CHANNEL = "fri:events"
+
+
+def _env_interval(name: str, default: float) -> float:
+    """Read a loop interval (seconds) from the environment.
+
+    Lets hosted deployments tune Redis command volume — e.g. on Upstash's
+    free tier (500K commands/month) raise the intervals via env vars
+    instead of editing code.
+    """
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+# Loop intervals (seconds) — docker defaults; override via env for hosted Redis
+COUNTS_INTERVAL_S = _env_interval("FRI_COUNTS_INTERVAL", 5)
+HEALTH_INTERVAL_S = _env_interval("FRI_HEALTH_INTERVAL", 10)
+SNAPSHOT_INTERVAL_S = _env_interval("FRI_SNAPSHOT_INTERVAL", 30)
+ROOMS_INTERVAL_S = _env_interval("FRI_ROOMS_INTERVAL", 60)
 
 # Rooms to long-poll continuously: always-poll set + the events discovery feed
 MONITORED_ROOMS: list[str] = list(dict.fromkeys([*ALWAYS_POLL_ROOMS, "events"]))
@@ -263,16 +284,16 @@ class CollectorLoop:
     # ------------------------------------------------------------------
 
     async def _rooms_loop(self) -> None:
-        """Every 60s: re-fetch /rooms metadata + re-score rooms."""
+        """Every ROOMS_INTERVAL_S: re-fetch /rooms metadata + re-score rooms."""
         while True:
-            await asyncio.sleep(60)
+            await asyncio.sleep(ROOMS_INTERVAL_S)
             await self._fetch_rooms()
             await self._snapshot_rooms()
 
     async def _snapshot_loop(self) -> None:
-        """Every 30s: snapshot indices + reputation to Redis."""
+        """Every SNAPSHOT_INTERVAL_S: snapshot indices + reputation to Redis."""
         while True:
-            await asyncio.sleep(30)
+            await asyncio.sleep(SNAPSHOT_INTERVAL_S)
             await self._snapshot_dids()
             await self._snapshot_kibble()
             await self._snapshot_tclk()
@@ -280,15 +301,15 @@ class CollectorLoop:
             await self._snapshot_rooms()
 
     async def _counts_loop(self) -> None:
-        """Every 5s: publish live counter updates."""
+        """Every COUNTS_INTERVAL_S: publish live counter updates."""
         while True:
-            await asyncio.sleep(5)
+            await asyncio.sleep(COUNTS_INTERVAL_S)
             await self._publish_counts()
 
     async def _health_loop(self) -> None:
-        """Every 10s: publish health status."""
+        """Every HEALTH_INTERVAL_S: publish health status."""
         while True:
-            await asyncio.sleep(10)
+            await asyncio.sleep(HEALTH_INTERVAL_S)
             await self._publish_health()
 
     # ------------------------------------------------------------------

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -25,8 +26,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("fri.api")
 
-REDIS_URL = "redis://redis:6379"
-BASE_URL = "https://technocore.chat"
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
+BASE_URL = os.environ.get("TECHNOCORE_BASE_URL", "https://technocore.chat")
 
 
 @asynccontextmanager
