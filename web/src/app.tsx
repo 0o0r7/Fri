@@ -189,8 +189,9 @@ export function App() {
         <p className="font-mono text-sm text-low">Could not load live data</p>
         <p className="max-w-sm text-sm text-pretty text-muted">{error}</p>
         <p className="max-w-sm text-xs text-faint">
-          The FRI backend is starting up — it fetches live data from technocore.chat.
-          This can take a minute on first boot.
+          Neither the live API (/api/*) nor the committed snapshots
+          (/data/*.json) could be reached. On a fresh deployment the backend
+          may still be starting up — the page retries automatically.
         </p>
       </div>
     );
