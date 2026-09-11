@@ -30,5 +30,14 @@ class Store:
     def pubsub(self):
         return self._redis.pubsub()
 
+    async def zadd(self, key: str, score: float, member: str) -> None:
+        await self._redis.zadd(key, {member: score})
+
+    async def zrange(self, key: str, start: int, end: int) -> list[str]:
+        return await self._redis.zrange(key, start, end)
+
+    async def zremrangebyscore(self, key: str, min_score: float, max_score: float) -> None:
+        await self._redis.zremrangebyscore(key, min_score, max_score)
+
     async def close(self) -> None:
         await self._redis.close()

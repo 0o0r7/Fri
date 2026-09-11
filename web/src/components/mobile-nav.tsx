@@ -1,14 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
-type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation";
+type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation" | "network" | "health" | "sdk-guide";
 
 const TABS: { id: Tab; labelKey: string }[] = [
   { id: "rooms", labelKey: "nav.rooms" },
   { id: "dids", labelKey: "nav.dids" },
-  { id: "kibble", labelKey: "nav.kibble" },
-  { id: "tclk", labelKey: "nav.tclk" },
   { id: "reputation", labelKey: "nav.reputation" },
+  { id: "network", labelKey: "nav.network" },
+  { id: "health", labelKey: "nav.health" },
 ];
 
 /**

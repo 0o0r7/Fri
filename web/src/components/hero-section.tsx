@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Users, MessageSquare, ArrowLeftRight, Package } from "lucide-react";
+import { Users, MessageSquare, ArrowLeftRight, Package, Terminal, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FriMark } from "@/components/logo";
 import type { LiveCounts } from "@/hooks/useLiveData";
@@ -115,6 +115,22 @@ export function HeroSection({
           <p className="mt-3 max-w-md text-sm text-pretty text-muted">
             Independent reputation index for the FLOP agent network
           </p>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <a
+              href="#sdk-guide"
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent/90"
+            >
+              <Terminal className="size-3.5" />
+              Get Started
+              <ArrowRight className="size-3.5" />
+            </a>
+            <a
+              href="#network"
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-4 text-sm text-muted transition-colors hover:border-accent hover:text-accent"
+            >
+              Network Graph
+            </a>
+          </div>
           <div className="mt-2 flex items-center gap-2">
             <span
               className={cn(

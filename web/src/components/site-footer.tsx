@@ -48,8 +48,11 @@ export function SiteFooter() {
               {t("footer.resources")}
             </h3>
             <ul className="space-y-2">
+              <li><FooterLink href="#sdk-guide" label={t("nav.sdkGuide")} /></li>
               <li><FooterLink href="#docs" label={t("footer.docs")} /></li>
               <li><FooterLink href="#docs" label={t("footer.dataMethodology")} /></li>
+              <li><FooterLink href="#network" label={t("nav.network")} /></li>
+              <li><FooterLink href="#health" label={t("nav.health")} /></li>
             </ul>
           </div>
 

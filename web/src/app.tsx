@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Bookmark } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IndexPage } from "@/components/index-page";
 import { DidsPage } from "@/components/dids-page";
@@ -20,9 +20,14 @@ import { DocsPage } from "@/components/pages/docs-page";
 import { PrivacyPage } from "@/components/pages/privacy-page";
 import { TermsPage } from "@/components/pages/terms-page";
 import { FaqPage } from "@/components/pages/faq-page";
+import { NetworkGraph } from "@/components/network-graph";
+import { WatchlistPage } from "@/components/watchlist-page";
+import { SdkGuidePage } from "@/components/sdk-guide-page";
+import { EcosystemHealth } from "@/components/ecosystem-health";
 import { cn } from "@/lib/utils";
 import { didFromHash, didToHash } from "@/lib/did-profile";
 import { useLiveData } from "@/hooks/useLiveData";
+import { useWatchlist } from "@/hooks/useWatchlist";
 import type {
   DidIndex,
   Feed,
@@ -31,13 +36,14 @@ import type {
   TclkIndex,
 } from "@/lib/types";
 
-type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation";
+type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation" | "network" | "health" | "sdk-guide";
 type PageInfo = "about" | "how-it-works" | "docs" | "privacy" | "terms" | "faq";
 
 type View =
   | { kind: "tab"; tab: Tab }
   | { kind: "profile"; did: string }
-  | { kind: "page"; page: PageInfo };
+  | { kind: "page"; page: PageInfo }
+  | { kind: "watchlist" };
 
 const TABS: { id: Tab; labelKey: string }[] = [
   { id: "rooms", labelKey: "nav.rooms" },
@@ -45,6 +51,9 @@ const TABS: { id: Tab; labelKey: string }[] = [
   { id: "kibble", labelKey: "nav.kibble" },
   { id: "tclk", labelKey: "nav.tclk" },
   { id: "reputation", labelKey: "nav.reputation" },
+  { id: "network", labelKey: "nav.network" },
+  { id: "health", labelKey: "nav.health" },
+  { id: "sdk-guide", labelKey: "nav.sdkGuide" },
 ];
 
 const INFO_PAGES: Record<string, PageInfo> = {
@@ -67,6 +76,10 @@ function viewFromHash(): View | null {
   if (lower.startsWith("#kibble")) return { kind: "tab", tab: "kibble" };
   if (lower.startsWith("#tclk")) return { kind: "tab", tab: "tclk" };
   if (lower.startsWith("#reputation")) return { kind: "tab", tab: "reputation" };
+  if (lower.startsWith("#network")) return { kind: "tab", tab: "network" };
+  if (lower.startsWith("#health")) return { kind: "tab", tab: "health" };
+  if (lower.startsWith("#sdk-guide")) return { kind: "tab", tab: "sdk-guide" };
+  if (lower.startsWith("#watchlist")) return { kind: "watchlist" };
   if (INFO_PAGES[lower]) return { kind: "page", page: INFO_PAGES[lower] };
   return null;
 }
@@ -80,12 +93,14 @@ export function App() {
     tclk,
     reputation,
     counts,
+    health,
     liveMessages,
     connected,
     stale,
     lastUpdate,
     error,
   } = useLiveData();
+  const watchlist = useWatchlist();
 
   const [view, setView] = useState<View>(
     () => viewFromHash() ?? { kind: "tab", tab: "rooms" },
@@ -113,6 +128,11 @@ export function App() {
     }
     window.location.hash = didToHash(did);
     setView({ kind: "profile", did });
+  }
+
+  function navigateToWatchlist() {
+    window.location.hash = "#watchlist";
+    setView({ kind: "watchlist" });
   }
 
   function handleLookup(e: React.FormEvent) {
@@ -150,6 +170,8 @@ export function App() {
           onLogoClick={() => switchTab("rooms")}
           onTabClick={switchTab}
           counts={navCounts}
+          watchlistCount={watchlist.count}
+          onWatchlistClick={navigateToWatchlist}
           connected={connected}
           stale={stale}
           lastUpdate={lastUpdate}
@@ -196,6 +218,8 @@ export function App() {
           onLogoClick={() => switchTab("reputation")}
           onTabClick={switchTab}
           counts={navCounts}
+          watchlistCount={watchlist.count}
+          onWatchlistClick={navigateToWatchlist}
           connected={connected}
           stale={stale}
           lastUpdate={lastUpdate}
@@ -209,7 +233,44 @@ export function App() {
           tclkIndex={tclk}
           reputationIndex={reputation}
           onNavigateDid={navigateToDid}
+          isWatched={watchlist.has(view.did)}
+          onToggleWatch={() => watchlist.toggle(view.did)}
         />
+        <SiteFooter />
+      </>
+    );
+  }
+
+  // Watchlist view
+  if (view.kind === "watchlist") {
+    return (
+      <>
+        <NavBar
+          activeTab={null}
+          lookupInput={lookupInput}
+          onLookupChange={setLookupInput}
+          onSubmitLookup={handleLookup}
+          onLogoClick={() => switchTab("rooms")}
+          onTabClick={switchTab}
+          counts={navCounts}
+          watchlistCount={watchlist.count}
+          onWatchlistClick={navigateToWatchlist}
+          connected={connected}
+          stale={stale}
+          lastUpdate={lastUpdate}
+          t={t}
+        />
+        {dids ? (
+          <WatchlistPage
+            watchlist={watchlist.watchlist}
+            didIndex={dids}
+            reputationIndex={reputation}
+            onNavigateDid={navigateToDid}
+            onRemove={watchlist.remove}
+          />
+        ) : (
+          <IndexPageSkeleton />
+        )}
         <SiteFooter />
       </>
     );
@@ -227,6 +288,8 @@ export function App() {
         onLogoClick={() => switchTab("rooms")}
         onTabClick={switchTab}
         counts={navCounts}
+        watchlistCount={watchlist.count}
+        onWatchlistClick={navigateToWatchlist}
         connected={connected}
         stale={stale}
         lastUpdate={lastUpdate}
@@ -246,6 +309,21 @@ export function App() {
           <KibblePage index={kibble} />
         ) : tab === "tclk" ? (
           <TclkPage index={tclk} />
+        ) : tab === "network" && dids ? (
+          <NetworkGraph
+            didIndex={dids}
+            reputationIndex={reputation}
+            onNavigateDid={navigateToDid}
+          />
+        ) : tab === "health" ? (
+          <EcosystemHealth
+            counts={counts}
+            health={health}
+            connected={connected}
+            stale={stale}
+          />
+        ) : tab === "sdk-guide" ? (
+          <SdkGuidePage />
         ) : (
           <ReputationPage index={reputation} />
         )}
@@ -268,6 +346,8 @@ function NavBar({
   onLogoClick,
   onTabClick,
   counts,
+  watchlistCount,
+  onWatchlistClick,
   connected,
   stale,
   lastUpdate,
@@ -280,6 +360,8 @@ function NavBar({
   onLogoClick: () => void;
   onTabClick: (tab: Tab) => void;
   counts: { dids: number; kibble: number; tclk: number; reputation: number };
+  watchlistCount: number;
+  onWatchlistClick: () => void;
   connected: boolean;
   stale: boolean;
   lastUpdate: number;
@@ -342,6 +424,24 @@ function NavBar({
                 }
               />
             ))}
+            <button
+              type="button"
+              onClick={onWatchlistClick}
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center gap-1.5 border-b-2 px-3 font-mono text-xs tracking-wide transition-colors",
+                activeTab === null
+                  ? "border-accent text-accent"
+                  : "border-transparent text-muted hover:text-fg",
+              )}
+              aria-label="Watchlist"
+            >
+              <Bookmark className="size-3.5" />
+              {watchlistCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded bg-accent/15 px-1 font-mono text-[10px] tabular-nums text-accent">
+                  {watchlistCount}
+                </span>
+              )}
+            </button>
           </div>
           <LanguageSelector compact />
         </div>

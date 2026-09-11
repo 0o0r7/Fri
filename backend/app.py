@@ -62,6 +62,27 @@ async def health():
     return await app.state.store.get("fri:health") or {"status": "starting"}
 
 
+@app.get("/api/health/snapshots")
+async def health_snapshots(hours: int = 24):
+    """Historical ecosystem health snapshots from Redis sorted set."""
+    now = time.time()
+    min_score = now - (hours * 3600)
+    members = await app.state.store.zrange("fri:health:snapshots", 0, -1)
+    snapshots = []
+    for m in members:
+        try:
+            s = json.loads(m)
+            # Filter by time range
+            ts_str = s.get("timestamp", "")
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            if dt.timestamp() >= min_score:
+                snapshots.append(s)
+        except Exception:
+            pass
+    return {"snapshots": snapshots, "count": len(snapshots)}
+
+
 @app.get("/api/counts")
 async def counts():
     return await app.state.store.get("fri:counts") or {}

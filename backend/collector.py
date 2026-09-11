@@ -78,6 +78,7 @@ class CollectorLoop:
 
         # Background tasks
         self._tasks: list[asyncio.Task] = []
+        self._last_health_snapshot = 0.0
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -109,6 +110,7 @@ class CollectorLoop:
             asyncio.create_task(self._snapshot_loop(), name="snapshot-loop"),
             asyncio.create_task(self._counts_loop(), name="counts-loop"),
             asyncio.create_task(self._health_loop(), name="health-loop"),
+            asyncio.create_task(self._health_snapshot_loop(), name="health-snapshot-loop"),
         ]
         log.info("Collector started — monitoring %d rooms", len(self.monitored))
 
@@ -377,3 +379,78 @@ class CollectorLoop:
         }
         await self.store.set("fri:health", health)
         await self.store.publish(REDIS_CHANNEL, {"type": "health", **health})
+
+    async def _health_snapshot_loop(self) -> None:
+        """Every 5 min: write aggregate ecosystem metrics to Redis sorted set."""
+        while True:
+            await asyncio.sleep(300)
+            try:
+                await self._write_health_snapshot()
+            except Exception as e:
+                log.warning("Health snapshot failed: %s", e)
+
+    async def _write_health_snapshot(self) -> None:
+        """Compute and store aggregate ecosystem health metrics."""
+        now = time.time()
+        ts = int(now)
+
+        # Daily active agents: DIDs active in last 24h
+        cutoff_24h = now - 86400
+        daily_active = 0
+        for did_stats in self.did_index._dids.values():
+            last = did_stats.get("last_active")
+            if last:
+                try:
+                    from datetime import datetime, timezone
+                    dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+                    if dt.timestamp() > cutoff_24h:
+                        daily_active += 1
+                except Exception:
+                    pass
+
+        # New DIDs per day: DIDs first seen in last 24h
+        new_dids = 0
+        for did_stats in self.did_index._dids.values():
+            first = did_stats.get("first_seen")
+            if first:
+                try:
+                    from datetime import datetime, timezone
+                    dt = datetime.fromisoformat(first.replace("Z", "+00:00"))
+                    if dt.timestamp() > cutoff_24h:
+                        new_dids += 1
+                except Exception:
+                    pass
+
+        # TCLK deal volume: count active (non-terminal) contracts
+        active_contracts = 0
+        for c in self.tclk_index._contracts.values():
+            state = c.get("state", "")
+            if state not in ("claimed", "refunded", "cancelled"):
+                active_contracts += 1
+
+        # Kibble completion rate: accepted / total
+        total_jobs = self.kibble_index.total_jobs
+        accepted_jobs = 0
+        for j in self.kibble_index._jobs.values():
+            if j.get("state") in ("accepted", "attested"):
+                accepted_jobs += 1
+        completion_rate = (accepted_jobs / total_jobs) if total_jobs > 0 else 0
+
+        snapshot = {
+            "timestamp": _now(),
+            "daily_active_agents": daily_active,
+            "new_dids_per_day": new_dids,
+            "tclk_deal_volume": active_contracts,
+            "kibble_completion_rate": round(completion_rate, 4),
+            "total_dids": self.did_index.total_dids,
+            "total_rooms": len(self.room_metas),
+            "total_jobs": total_jobs,
+            "total_contracts": self.tclk_index.total_contracts,
+        }
+
+        member = json.dumps(snapshot)
+        await self.store.zadd("fri:health:snapshots", float(ts), member)
+        # Keep only last 7 days of snapshots (7 * 24 * 12 = 2016 entries at 5min intervals)
+        await self.store.zremrangebyscore("fri:health:snapshots", 0, float(now - 604800))
+        self._last_health_snapshot = now
+        log.info("Health snapshot written: %s", snapshot)

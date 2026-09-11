@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import { filterDids, didIndexStats, type ReputationFilter, type ActivityFilter } from "@/lib/did-filter";
 import { absoluteTime, relativeTime } from "@/lib/format";
+import { useWatchlist } from "@/hooks/useWatchlist";
 import type { DidIndex, DidSortKey, ReputationIndex } from "@/lib/types";
 
 const SORTS: { id: DidSortKey; label: string }[] = [
@@ -46,6 +47,7 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
   const [selected, setSelected] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const watchlist = useWatchlist();
 
   const stats = useMemo(() => didIndexStats(index), [index]);
   const repMap = useMemo(() => {
@@ -228,6 +230,8 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
                     reputation={repMap.get(did.did)}
                     selected={selectedDid?.did === did.did}
                     onSelect={selectDid}
+                    isWatched={watchlist.has(did.did)}
+                    onToggleWatch={() => watchlist.toggle(did.did)}
                   />
                 ))}
                 <LoadMore
