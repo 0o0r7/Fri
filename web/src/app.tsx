@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { IndexPage } from "@/components/index-page";
 import { DidsPage } from "@/components/dids-page";
 import { KibblePage } from "@/components/kibble-page";
@@ -11,6 +12,14 @@ import { LiveTicker } from "@/components/live-ticker";
 import { FriMark } from "@/components/logo";
 import { HeroSection } from "@/components/hero-section";
 import { MobileNav } from "@/components/mobile-nav";
+import { SiteFooter } from "@/components/site-footer";
+import { LanguageSelector } from "@/components/language-selector";
+import { AboutPage } from "@/components/pages/about-page";
+import { HowItWorksPage } from "@/components/pages/how-it-works-page";
+import { DocsPage } from "@/components/pages/docs-page";
+import { PrivacyPage } from "@/components/pages/privacy-page";
+import { TermsPage } from "@/components/pages/terms-page";
+import { FaqPage } from "@/components/pages/faq-page";
 import { cn } from "@/lib/utils";
 import { didFromHash, didToHash } from "@/lib/did-profile";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -23,18 +32,29 @@ import type {
 } from "@/lib/types";
 
 type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation";
+type PageInfo = "about" | "how-it-works" | "docs" | "privacy" | "terms" | "faq";
 
 type View =
   | { kind: "tab"; tab: Tab }
-  | { kind: "profile"; did: string };
+  | { kind: "profile"; did: string }
+  | { kind: "page"; page: PageInfo };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "rooms", label: "Rooms" },
-  { id: "dids", label: "DIDs" },
-  { id: "kibble", label: "Kibble" },
-  { id: "tclk", label: "TCLK" },
-  { id: "reputation", label: "Reputation" },
+const TABS: { id: Tab; labelKey: string }[] = [
+  { id: "rooms", labelKey: "nav.rooms" },
+  { id: "dids", labelKey: "nav.dids" },
+  { id: "kibble", labelKey: "nav.kibble" },
+  { id: "tclk", labelKey: "nav.tclk" },
+  { id: "reputation", labelKey: "nav.reputation" },
 ];
+
+const INFO_PAGES: Record<string, PageInfo> = {
+  "#about": "about",
+  "#how-it-works": "how-it-works",
+  "#docs": "docs",
+  "#privacy": "privacy",
+  "#terms": "terms",
+  "#faq": "faq",
+};
 
 function viewFromHash(): View | null {
   if (typeof window === "undefined") return { kind: "tab", tab: "rooms" };
@@ -47,10 +67,12 @@ function viewFromHash(): View | null {
   if (lower.startsWith("#kibble")) return { kind: "tab", tab: "kibble" };
   if (lower.startsWith("#tclk")) return { kind: "tab", tab: "tclk" };
   if (lower.startsWith("#reputation")) return { kind: "tab", tab: "reputation" };
+  if (INFO_PAGES[lower]) return { kind: "page", page: INFO_PAGES[lower] };
   return null;
 }
 
 export function App() {
+  const { t } = useTranslation();
   const {
     feed,
     dids,
@@ -102,6 +124,43 @@ export function App() {
     }
   }
 
+  // Info pages — render immediately, no live data needed
+  if (view.kind === "page") {
+    const navCounts = {
+      dids: counts?.total_dids ?? dids?.total_dids ?? 0,
+      kibble: counts?.total_jobs ?? kibble?.total_jobs ?? 0,
+      tclk: counts?.total_contracts ?? tclk?.total_contracts ?? 0,
+      reputation: counts?.total_dids_scored ?? reputation?.total_dids_scored ?? 0,
+    };
+    const pageMap: Record<PageInfo, React.ReactNode> = {
+      about: <AboutPage />,
+      "how-it-works": <HowItWorksPage />,
+      docs: <DocsPage />,
+      privacy: <PrivacyPage />,
+      terms: <TermsPage />,
+      faq: <FaqPage />,
+    };
+    return (
+      <>
+        <NavBar
+          activeTab={null}
+          lookupInput={lookupInput}
+          onLookupChange={setLookupInput}
+          onSubmitLookup={handleLookup}
+          onLogoClick={() => switchTab("rooms")}
+          onTabClick={switchTab}
+          counts={navCounts}
+          connected={connected}
+          stale={stale}
+          lastUpdate={lastUpdate}
+          t={t}
+        />
+        {pageMap[view.page]}
+        <SiteFooter />
+      </>
+    );
+  }
+
   if (error && !feed) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
@@ -140,6 +199,7 @@ export function App() {
           connected={connected}
           stale={stale}
           lastUpdate={lastUpdate}
+          t={t}
         />
         <LiveTicker messages={liveMessages} connected={connected} />
         <DidProfilePage
@@ -150,6 +210,7 @@ export function App() {
           reputationIndex={reputation}
           onNavigateDid={navigateToDid}
         />
+        <SiteFooter />
       </>
     );
   }
@@ -169,6 +230,7 @@ export function App() {
         connected={connected}
         stale={stale}
         lastUpdate={lastUpdate}
+        t={t}
       />
 
       <LiveTicker messages={liveMessages} connected={connected} />
@@ -188,6 +250,7 @@ export function App() {
           <ReputationPage index={reputation} />
         )}
       </div>
+      <SiteFooter />
       <MobileNav
         activeTab={tab}
         onTabClick={switchTab}
@@ -208,8 +271,9 @@ function NavBar({
   connected,
   stale,
   lastUpdate,
+  t,
 }: {
-  activeTab: Tab;
+  activeTab: Tab | null;
   lookupInput: string;
   onLookupChange: (v: string) => void;
   onSubmitLookup: (e: React.FormEvent) => void;
@@ -219,6 +283,7 @@ function NavBar({
   connected: boolean;
   stale: boolean;
   lastUpdate: number;
+  t: (key: string) => string;
 }) {
   return (
     <nav className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/80">
@@ -246,7 +311,7 @@ function NavBar({
             <input
               value={lookupInput}
               onChange={(e) => onLookupChange(e.target.value)}
-              placeholder="Lookup did:key:…"
+              placeholder={t("nav.lookupPlaceholder")}
               spellCheck={false}
               autoComplete="off"
               aria-label="Lookup DID"
@@ -258,26 +323,27 @@ function NavBar({
             role="tablist"
             aria-label="Sections"
           >
-            {TABS.map((t) => (
+            {TABS.map((tab) => (
               <TabButton
-                key={t.id}
-                active={activeTab === t.id}
-                onClick={() => onTabClick(t.id)}
-                label={t.label}
+                key={tab.id}
+                active={activeTab === tab.id}
+                onClick={() => onTabClick(tab.id)}
+                label={t(tab.labelKey)}
                 count={
-                  t.id === "dids"
+                  tab.id === "dids"
                     ? counts.dids
-                    : t.id === "kibble"
+                    : tab.id === "kibble"
                       ? counts.kibble
-                      : t.id === "tclk"
+                      : tab.id === "tclk"
                         ? counts.tclk
-                        : t.id === "reputation"
+                        : tab.id === "reputation"
                           ? counts.reputation
                           : null
                 }
               />
             ))}
           </div>
+          <LanguageSelector compact />
         </div>
       </div>
     </nav>

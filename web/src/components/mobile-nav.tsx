@@ -1,13 +1,14 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 type Tab = "rooms" | "dids" | "kibble" | "tclk" | "reputation";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "rooms", label: "Rooms" },
-  { id: "dids", label: "DIDs" },
-  { id: "kibble", label: "Kibble" },
-  { id: "tclk", label: "TCLK" },
-  { id: "reputation", label: "Rep" },
+const TABS: { id: Tab; labelKey: string }[] = [
+  { id: "rooms", labelKey: "nav.rooms" },
+  { id: "dids", labelKey: "nav.dids" },
+  { id: "kibble", labelKey: "nav.kibble" },
+  { id: "tclk", labelKey: "nav.tclk" },
+  { id: "reputation", labelKey: "nav.reputation" },
 ];
 
 /**
@@ -23,33 +24,34 @@ export function MobileNav({
   onTabClick: (tab: Tab) => void;
   counts: { dids: number; kibble: number; tclk: number; reputation: number };
 }) {
+  const { t } = useTranslation();
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/80 lg:hidden">
       <div className="flex items-stretch justify-around">
-        {TABS.map((t) => {
+        {TABS.map((tab) => {
           const count =
-            t.id === "dids"
+            tab.id === "dids"
               ? counts.dids
-              : t.id === "kibble"
+              : tab.id === "kibble"
                 ? counts.kibble
-                : t.id === "tclk"
+                : tab.id === "tclk"
                   ? counts.tclk
-                  : t.id === "reputation"
+                  : tab.id === "reputation"
                     ? counts.reputation
                     : null;
           return (
             <button
-              key={t.id}
+              key={tab.id}
               type="button"
-              onClick={() => onTabClick(t.id)}
+              onClick={() => onTabClick(tab.id)}
               className={cn(
                 "flex flex-1 flex-col items-center gap-0.5 py-2 font-mono text-[10px] tracking-wide transition-colors",
-                activeTab === t.id
+                activeTab === tab.id
                   ? "text-accent"
                   : "text-faint hover:text-muted",
               )}
             >
-              <span className="font-bold">{t.label}</span>
+              <span className="font-bold">{t(tab.labelKey)}</span>
               {count != null && (
                 <span className="tabular-nums text-[9px]">
                   {count.toLocaleString()}
