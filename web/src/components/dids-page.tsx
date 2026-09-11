@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DidRow } from "@/components/did-row";
+import { AgentCard } from "@/components/agent-card";
 import { DidDetail, DidEmptyDetail } from "@/components/did-detail";
 import {
   LoadMore,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui";
 import { filterDids, didIndexStats } from "@/lib/did-filter";
 import { absoluteTime, relativeTime } from "@/lib/format";
-import type { DidIndex, DidSortKey } from "@/lib/types";
+import type { DidIndex, DidSortKey, ReputationIndex } from "@/lib/types";
 
 const SORTS: { id: DidSortKey; label: string }[] = [
   { id: "messages", label: "Messages" },
@@ -22,7 +22,7 @@ const SORTS: { id: DidSortKey; label: string }[] = [
 
 const PAGE_SIZE = 20;
 
-export function DidsPage({ index }: { index: DidIndex }) {
+export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputationIndex: ReputationIndex | null }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<DidSortKey>("messages");
   const [selected, setSelected] = useState<string | null>(null);
@@ -35,6 +35,11 @@ export function DidsPage({ index }: { index: DidIndex }) {
     [index.dids, query, sort],
   );
   const { visible, visibleCount, loadMore, total } = usePagination(dids, PAGE_SIZE);
+
+  const repMap = useMemo(() => {
+    if (!reputationIndex) return new Map<string, ReputationIndex["dids"][number]>();
+    return new Map(reputationIndex.dids.map((d) => [d.did, d]));
+  }, [reputationIndex]);
 
   const selectedDid =
     dids.find((d) => d.did === selected) ?? dids[0] ?? null;
@@ -180,12 +185,13 @@ export function DidsPage({ index }: { index: DidIndex }) {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-2 gap-2">
                 {visible.map((did, i) => (
-                  <DidRow
+                  <AgentCard
                     key={did.did}
                     did={did}
                     rank={i + 1}
+                    reputation={repMap.get(did.did)}
                     selected={selectedDid?.did === did.did}
                     onSelect={selectDid}
                   />

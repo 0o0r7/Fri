@@ -9,6 +9,8 @@ import { DidProfilePage } from "@/components/did-profile-page";
 import { IndexPageSkeleton } from "@/components/skeleton";
 import { LiveTicker } from "@/components/live-ticker";
 import { FriMark } from "@/components/logo";
+import { HeroSection } from "@/components/hero-section";
+import { MobileNav } from "@/components/mobile-nav";
 import { cn } from "@/lib/utils";
 import { didFromHash, didToHash } from "@/lib/did-profile";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -170,17 +172,27 @@ export function App() {
       />
 
       <LiveTicker messages={liveMessages} connected={connected} />
-      {tab === "rooms" ? (
-        <IndexPage feed={feed} />
-      ) : tab === "dids" ? (
-        <DidsPage index={dids} />
-      ) : tab === "kibble" ? (
-        <KibblePage index={kibble} />
-      ) : tab === "tclk" ? (
-        <TclkPage index={tclk} />
-      ) : (
-        <ReputationPage index={reputation} />
-      )}
+      <div className="pb-14 lg:pb-0">
+        {tab === "rooms" ? (
+          <>
+            <HeroSection counts={counts} connected={connected} stale={stale} />
+            <IndexPage feed={feed} />
+          </>
+        ) : tab === "dids" ? (
+          <DidsPage index={dids} reputationIndex={reputation} />
+        ) : tab === "kibble" ? (
+          <KibblePage index={kibble} />
+        ) : tab === "tclk" ? (
+          <TclkPage index={tclk} />
+        ) : (
+          <ReputationPage index={reputation} />
+        )}
+      </div>
+      <MobileNav
+        activeTab={tab}
+        onTabClick={switchTab}
+        counts={navCounts}
+      />
     </>
   );
 }
@@ -242,7 +254,7 @@ function NavBar({
             />
           </form>
           <div
-            className="flex items-center gap-0 overflow-x-auto rounded border border-border bg-surface"
+            className="hidden items-center gap-0 overflow-x-auto rounded border border-border bg-surface lg:flex"
             role="tablist"
             aria-label="Sections"
           >
