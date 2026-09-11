@@ -78,7 +78,8 @@ export type DidSortKey =
   | "messages"
   | "rooms"
   | "recent"
-  | "avg_len";
+  | "avg_len"
+  | "reputation";
 
 // ---------------------------------------------------------------------------
 // Kibble index (Phase 2)

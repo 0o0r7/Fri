@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { relativeTime, tinyDid } from "@/lib/format";
 import { ScoreBar } from "@/components/score-meter";
-import { scoreBand } from "@/lib/score";
+import { reputationBand } from "@/lib/reputation-filter";
 import type { DidStats, ReputationEntry } from "@/lib/types";
 
 /**
@@ -22,8 +22,8 @@ export function AgentCard({
   selected: boolean;
   onSelect: (did: string) => void;
 }) {
-  const band = reputation ? scoreBand(reputation.reputation_score) : null;
-  const barTone = band === "high" ? "good" : band === "mid" ? "mid" : "low";
+  const band = reputation ? reputationBand(reputation.reputation_score) : null;
+  const barTone = band === "high" ? "good" : band === "medium" ? "mid" : "low";
 
   return (
     <button
@@ -59,7 +59,7 @@ export function AgentCard({
         <div className="flex items-center gap-2">
           <ScoreBar
             value={reputation.reputation_score}
-            max={100}
+            max={1}
             tone={barTone}
           />
           <span
@@ -67,12 +67,12 @@ export function AgentCard({
               "font-mono text-xs tabular-nums",
               band === "high"
                 ? "text-good"
-                : band === "mid"
+                : band === "medium"
                   ? "text-mid"
                   : "text-low",
             )}
           >
-            {reputation.reputation_score.toFixed(1)}
+            {(reputation.reputation_score * 100).toFixed(0)}
           </span>
         </div>
       )}

@@ -1,14 +1,22 @@
-import type { DidIndex, DidSortKey, DidStats } from "./types";
+import type { DidIndex, DidSortKey, DidStats, ReputationEntry } from "./types";
+import { reputationBand } from "./reputation-filter";
+
+export type ReputationFilter = "all" | "high" | "mid" | "low";
+export type ActivityFilter = "all" | "high" | "medium" | "low";
 
 export function filterDids(
   dids: DidStats[],
   opts: {
     query: string;
     sort: DidSortKey;
+    reputation?: ReputationFilter;
+    activity?: ActivityFilter;
+    room?: string;
   },
+  repMap?: Map<string, ReputationEntry>,
 ): DidStats[] {
   const q = opts.query.trim().toLowerCase();
-  const list = q
+  let list = q
     ? dids.filter(
         (d) =>
           d.did.toLowerCase().includes(q) ||
@@ -16,6 +24,27 @@ export function filterDids(
           d.rooms.some((r) => r.toLowerCase().includes(q)),
       )
     : dids;
+
+  if (opts.reputation && opts.reputation !== "all" && repMap) {
+    list = list.filter((d) => {
+      const rep = repMap.get(d.did);
+      if (!rep) return false;
+      return reputationBand(rep.reputation_score) === opts.reputation;
+    });
+  }
+
+  if (opts.activity && opts.activity !== "all") {
+    list = list.filter((d) => {
+      const m = d.messages_signed;
+      if (opts.activity === "high") return m >= 100;
+      if (opts.activity === "medium") return m >= 10 && m < 100;
+      return m < 10;
+    });
+  }
+
+  if (opts.room) {
+    list = list.filter((d) => d.rooms.includes(opts.room!));
+  }
 
   const sorted = [...list];
   sorted.sort((a, b) => {
@@ -31,6 +60,11 @@ export function filterDids(
         );
       case "avg_len":
         return b.avg_message_length - a.avg_message_length;
+      case "reputation": {
+        const ra = repMap?.get(a.did)?.reputation_score ?? 0;
+        const rb = repMap?.get(b.did)?.reputation_score ?? 0;
+        return rb - ra || b.messages_signed - a.messages_signed;
+      }
       default:
         return b.messages_signed - a.messages_signed;
     }
