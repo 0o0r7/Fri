@@ -415,14 +415,16 @@ class CollectorLoop:
         now = time.time()
         ts = int(now)
 
-        # Daily active agents: DIDs active in last 24h
+        # Daily active agents: DIDs active in last 24h.
+        # NOTE: did_index._dids holds DidStats dataclass instances — attribute
+        # access only. (A .get() call here raised AttributeError, which the
+        # loop's try/except swallowed: this snapshot never wrote in prod.)
         cutoff_24h = now - 86400
         daily_active = 0
         for did_stats in self.did_index._dids.values():
-            last = did_stats.get("last_active")
+            last = did_stats.last_active
             if last:
                 try:
-                    from datetime import datetime, timezone
                     dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
                     if dt.timestamp() > cutoff_24h:
                         daily_active += 1
@@ -432,10 +434,9 @@ class CollectorLoop:
         # New DIDs per day: DIDs first seen in last 24h
         new_dids = 0
         for did_stats in self.did_index._dids.values():
-            first = did_stats.get("first_seen")
+            first = did_stats.first_seen
             if first:
                 try:
-                    from datetime import datetime, timezone
                     dt = datetime.fromisoformat(first.replace("Z", "+00:00"))
                     if dt.timestamp() > cutoff_24h:
                         new_dids += 1
@@ -445,7 +446,9 @@ class CollectorLoop:
         # TCLK deal volume: count active (non-terminal) contracts
         active_contracts = 0
         for c in self.tclk_index._contracts.values():
-            state = c.get("state", "")
+            # c is a TclkContract dataclass; .state is a derived property.
+            # Terminal set == TCLK SPEC §3.5 receipt outcomes (KNOWN_OUTCOMES).
+            state = c.state
             if state not in ("claimed", "refunded", "cancelled"):
                 active_contracts += 1
 
@@ -453,7 +456,8 @@ class CollectorLoop:
         total_jobs = self.kibble_index.total_jobs
         accepted_jobs = 0
         for j in self.kibble_index._jobs.values():
-            if j.get("state") in ("accepted", "attested"):
+            # j is a KibbleJob dataclass; .state is a derived property.
+            if j.state in ("accepted", "attested"):
                 accepted_jobs += 1
         completion_rate = (accepted_jobs / total_jobs) if total_jobs > 0 else 0
 
