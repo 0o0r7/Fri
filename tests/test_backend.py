@@ -15,11 +15,13 @@ import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 
-from collector.did_index import DidStats
-from collector.kibble import KibbleJob
-from collector.tclk import TclkContract
+from fastapi import HTTPException
 
-from backend.app import app, counts, health, health_snapshots, rooms
+from collector.did_index import DidIndex, DidStats
+from collector.kibble import KibbleIndex, KibbleJob
+from collector.tclk import TclkContract, TclkIndex
+
+from backend.app import app, counts, did_profile, did_score, health, health_snapshots, rooms
 from backend.collector import CollectorLoop
 
 
@@ -51,6 +53,14 @@ class FakeStore:
 
     async def zrange(self, key, start, end):
         return list(self.zsets.get(key, {}).keys())
+
+    async def zrangebyscore(self, key, min_score, max_score):
+        """Inclusive score range, mirroring Redis ZRANGEBYSCORE semantics."""
+        lo = float("-inf") if isinstance(min_score, str) else min_score
+        hi = float("inf") if isinstance(max_score, str) else max_score
+        return [
+            m for m, s in self.zsets.get(key, {}).items() if lo <= s <= hi
+        ]
 
     async def ping(self):
         return True
@@ -211,3 +221,106 @@ class TestRoutes:
         result = asyncio.run(run())
         assert result["count"] == 1
         assert result["snapshots"] == [fresh]
+
+    def test_health_snapshots_clamps_hours_to_retention_window(self):
+        """hours is clamped to 1..168 — the store only keeps 7 days anyway,
+        so a huge value used to widen the scan for zero extra data."""
+        now = datetime.now(timezone.utc)
+        fresh = {"timestamp": _iso(now)}
+        old = {"timestamp": _iso(now - timedelta(days=8))}
+
+        async def run(hours):
+            store = self._install(FakeStore())
+            zset = store.zsets.setdefault("fri:health:snapshots", {})
+            zset[json.dumps(fresh)] = now.timestamp()
+            zset[json.dumps(old)] = (now - timedelta(days=8)).timestamp()
+            return await health_snapshots(hours=hours)
+
+        huge = asyncio.run(run(hours=10**9))
+        zero = asyncio.run(run(hours=0))
+        negative = asyncio.run(run(hours=-5))
+        for result in (huge, zero, negative):
+            assert result["count"] == 1
+            assert result["snapshots"] == [fresh]
+
+
+class TestPerDidEndpoints:
+    DID = "did:key:z6MkTest"
+
+    def _install(self, store: FakeStore) -> FakeStore:
+        app.state.store = store
+        return store
+
+    def test_score_from_snapshot(self):
+        async def run():
+            store = self._install(FakeStore())
+            store.data["fri:reputation"] = {
+                "dids": [{"did": self.DID, "reputation_score": 0.5}]
+            }
+            return await did_score(self.DID)
+
+        assert asyncio.run(run())["reputation_score"] == 0.5
+
+    def test_score_404_when_unknown_everywhere(self):
+        async def run():
+            self._install(FakeStore())
+            app.state.collector_ready = False
+            try:
+                await did_score("did:key:unknown")
+                return None
+            except HTTPException as e:
+                return e.status_code
+
+        assert asyncio.run(run()) == 404
+
+    def test_score_live_fallback_for_new_dids(self):
+        """A DID active after the last snapshot still scores — from the
+        live indices, no need to wait for the next 30s cycle."""
+        now = datetime.now(timezone.utc)
+
+        async def run():
+            collector = _build_collector(now)
+            app.state.collector = collector
+            app.state.collector_ready = True
+            self._install(FakeStore())  # no fri:reputation snapshot at all
+            try:
+                return await did_score("did:key:a1")
+            finally:
+                app.state.collector_ready = False
+                await collector.client.aclose()
+
+        body = asyncio.run(run())
+        assert body["did"] == "did:key:a1"
+        assert "components" in body
+        assert 0.0 <= body["reputation_score"] <= 1.0
+
+    def test_profile_aggregates_snapshots(self):
+        async def run():
+            store = self._install(FakeStore())
+            store.data["fri:dids"] = {
+                "dids": [{
+                    "did": self.DID,
+                    "messages_signed": 10,
+                    "rooms_breakdown": {"lobby": 10},
+                }]
+            }
+            store.data["fri:reputation"] = {
+                "dids": [{"did": self.DID, "reputation_score": 0.7}]
+            }
+            return await did_profile(self.DID)
+
+        body = asyncio.run(run())
+        assert body["did_stats"]["messages_signed"] == 10
+        assert body["reputation"]["reputation_score"] == 0.7
+
+    def test_profile_404_when_unknown_everywhere(self):
+        async def run():
+            self._install(FakeStore())
+            app.state.collector_ready = False
+            try:
+                await did_profile("did:key:unknown")
+                return None
+            except HTTPException as e:
+                return e.status_code
+
+        assert asyncio.run(run()) == 404

@@ -32,8 +32,8 @@ technocore.chat  ←──long-poll (wait=10)──→  FRI Backend (FastAPI)
 
 ### Backend (`backend/`)
 
-- `app.py` — FastAPI app: REST endpoints (`/api/*` return cached snapshots from Redis) + SSE (`/api/live` multiplexed event stream)
-- `collector.py` — async collector loop: long-polls rooms with `wait=10`, feeds messages to existing scoring modules, snapshots to Redis, publishes events
+- `app.py` — FastAPI app: REST endpoints (`/api/*` return cached snapshots from Redis; per-DID drill-down at `/api/did/{did}/score` and `/api/did/{did}/profile`) + SSE (`/api/live` multiplexed event stream)
+- `collector.py` — async collector loop: long-polls rooms with `wait=10`, feeds messages to existing scoring modules, snapshots to Redis, publishes events. At boot it seeds Redis AND hydrates the in-memory indices from the committed `data/*.json` batch baseline, so counts/health/reputation start from full history instead of empty
 - `store.py` — Redis wrapper for JSON caching + pub/sub
 
 The collector reuses existing modules (`collector/did_index.py`, `kibble.py`, `tclk.py`, `reputation.py`, `score.py`) — only orchestration changed from batch to continuous async. The `did_index.py` has a fallback `did_note_fingerprint` (sha256[:16]) when flopkit is not installed, so the backend doesn't need the flopkit git dependency.
@@ -69,7 +69,7 @@ If technocore is unreachable, the backend serves last cached data from Redis wit
 - Backend edits hot-reload via `uvicorn --reload`
 - Frontend edits hot-reload via Vite HMR
 - The Python collector and its `flopkit` git dependency are NOT needed for the live backend — it uses a standalone fingerprint fallback
-- The committed `data/*.json` files serve as the initial Redis seed (instant frontend display on boot); live data replaces them within ~30s
+- The committed `data/*.json` files serve as the initial Redis seed (instant frontend display on boot) AND as the boot-time hydration source for the live indices (`hydrate()` on each index — round-trips everything the batch published; live ingest wins for DIDs/contracts already known); live data replaces them within ~30s
 - Tailwind v4 via `@tailwindcss/vite` plugin; theme tokens in `web/src/styles.css`
 - Path alias `@` → `web/src` (vite.config.ts + tsconfig)
 
