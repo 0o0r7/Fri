@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
+import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation } from "d3-force";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity } from "d3-zoom";
 import { cn } from "@/lib/utils";
@@ -87,12 +87,14 @@ export function NetworkGraph({
 
     let filtered = sorted.slice(0, MAX_NODES);
 
-    // Apply band filter
+    // Apply band filter — note: reputationBand() returns "medium", the UI
+    // filter value is "mid"
     if (bandFilter !== "all") {
       filtered = filtered.filter((d) => {
         const rep = repMap.get(d.did);
         if (!rep) return bandFilter === "low";
-        return reputationBand(rep.reputation_score) === bandFilter;
+        const band = reputationBand(rep.reputation_score);
+        return band === (bandFilter === "mid" ? "medium" : bandFilter);
       });
     }
 
@@ -103,17 +105,22 @@ export function NetworkGraph({
 
     const nodeSet = new Set(filtered.map((d) => d.did));
 
-    const graphNodes: GraphNode[] = filtered.map((d) => {
+    const graphNodes: GraphNode[] = filtered.map((d, i) => {
       const rep = repMap.get(d.did);
       const score = rep?.reputation_score ?? 0;
+      // Deterministic golden-angle (phyllotaxis) starting disc — evenly
+      // spread, stable across reloads. The simulation is pre-warmed below so
+      // users always see a settled layout.
+      const startA = i * 2.399963229728653;
+      const startR = Math.sqrt((i + 0.5) / Math.max(1, filtered.length)) * Math.min(width, height) * 0.35;
       return {
         id: d.did,
         did: d,
         reputation: rep,
         score,
         band: rep ? reputationBand(score) : "low",
-        x: width / 2 + (Math.random() - 0.5) * 100,
-        y: height / 2 + (Math.random() - 0.5) * 100,
+        x: width / 2 + Math.cos(startA) * startR,
+        y: height / 2 + Math.sin(startA) * startR,
         vx: 0,
         vy: 0,
       };
@@ -159,20 +166,55 @@ export function NetworkGraph({
     if (nodes.length === 0) return;
 
     const sim = forceSimulation<GraphNode>(nodes)
-      .force("charge", forceManyBody().strength(-60))
+      .force("charge", forceManyBody().strength(-140))
       .force(
         "link",
         forceLink<GraphNode, GraphLink>(links)
           .id((d) => d.id)
-          .distance((l) => 80 / (l.weight + 1))
-          .strength((l) => 0.1 * l.weight),
+          .distance((l) => 70 + 130 / l.weight)
+          .strength((l) => Math.min(0.5, 0.04 + 0.06 * l.weight)),
       )
-      .force("collide", forceCollide<GraphNode>((d) => nodeRadius(d) + 4))
-      .force("center", forceCenter(width / 2, height / 2))
-      .alphaDecay(0.03)
-      .on("tick", () => setTick((t) => t + 1));
+      .force("collide", forceCollide<GraphNode>((d) => nodeRadius(d) + 6).iterations(2))
+      // Gentle gravity instead of forceCenter: it also holds disconnected
+      // single-node components near the main cluster instead of letting
+      // charge repulsion fling them to the canvas edges.
+      .force("x", forceX<GraphNode>(width / 2).strength(0.045))
+      .force("y", forceY<GraphNode>(height / 2).strength(0.06))
+      .alphaDecay(0.02);
 
     simRef.current = sim;
+
+    // Pre-warm the layout synchronously, then stop. Previously the sim ran
+    // ~2000+ ticks with a React re-render per tick, so the tab showed a
+    // minutes-long random mid-flight animation and often froze clumped.
+    sim.tick(280);
+    sim.on("tick", null);
+    sim.stop();
+
+    // Fit the settled layout into the viewport: scale + translate node
+    // coordinates so the whole graph (incl. outlier components) is visible
+    // and roughly centered. Links reference the same node objects, so they
+    // follow automatically.
+    if (width > 160 && height > 160) {
+      const pad = 60;
+      const xs = nodes.map((n) => n.x);
+      const ys = nodes.map((n) => n.y);
+      const bx = Math.min(...xs) - pad;
+      const by = Math.min(...ys) - pad;
+      const bw = Math.max(...xs) + pad - bx;
+      const bh = Math.max(...ys) + pad - by;
+      if (bw > 0 && bh > 0) {
+        const k = Math.min((width - 2 * pad) / bw, (height - 2 * pad) / bh, 1.15);
+        const cx = bx + bw / 2;
+        const cy = by + bh / 2;
+        for (const n of nodes) {
+          n.x = (n.x - cx) * k + width / 2;
+          n.y = (n.y - cy) * k + height / 2;
+        }
+      }
+    }
+
+    setTick((t) => t + 1);
 
     return () => {
       sim.stop();
@@ -180,9 +222,11 @@ export function NetworkGraph({
     };
   }, [nodes, links, width, height]);
 
-  // Pan/zoom
+  // Pan/zoom — re-attach if the svg remounts (e.g. after the empty-state
+  // branch unmounted it); resize deliberately does NOT reset the transform.
+  const svgReady = nodes.length > 0;
   useEffect(() => {
-    if (!svgRef.current) return;
+    if (!svgReady || !svgRef.current) return;
     const svg = select(svgRef.current);
     const g = svg.select("g.zoom-layer");
     const zb = zoom<SVGSVGElement, unknown>().scaleExtent([0.3, 4]).on("zoom", (event) => {
@@ -193,7 +237,7 @@ export function NetworkGraph({
     return () => {
       svg.on(".zoom", null);
     };
-  }, []);
+  }, [svgReady]);
 
   // Debounced re-render trigger
   const tickRef = useRef(0);
@@ -300,13 +344,15 @@ export function NetworkGraph({
         </div>
 
         {nodes.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
             <p className="font-mono text-sm text-muted">No agents match this filter.</p>
           </div>
         ) : (
           <svg
             ref={svgRef}
-            className="h-full w-full"
+            width={width}
+            height={height}
+            className="absolute inset-0"
             style={{ cursor: "grab" }}
           >
             <g className="zoom-layer">
