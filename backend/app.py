@@ -13,11 +13,13 @@ import os
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
+
+from collector.reputation import ReputationScorer
 
 from .collector import REDIS_CHANNEL, CollectorLoop
 from .store import Store
@@ -33,6 +35,10 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 BASE_URL = os.environ.get("TECHNOCORE_BASE_URL", "https://technocore.chat")
 
 COLLECTOR_RETRY_S = float(os.environ.get("FRI_COLLECTOR_RETRY_S", "30"))
+
+# The collector prunes fri:health:snapshots to 7 days, so asking for more
+# than 168h can never return more data — it only widened the scan range.
+MAX_SNAPSHOT_HOURS = 168
 
 
 async def _retry_collector_start(
@@ -147,20 +153,21 @@ async def health():
 
 @app.get("/api/health/snapshots")
 async def health_snapshots(hours: int = 24):
-    """Historical ecosystem health snapshots from Redis sorted set."""
-    now = time.time()
-    min_score = now - (hours * 3600)
-    members = await app.state.store.zrange("fri:health:snapshots", 0, -1)
+    """Historical ecosystem health snapshots from Redis sorted set.
+
+    `hours` is clamped to 1..168 (the store only retains 7 days) and the
+    range is applied server-side via ZRANGEBYSCORE, so a request can no
+    longer pull the whole zset just to discard most of it in Python.
+    """
+    hours = max(1, min(hours, MAX_SNAPSHOT_HOURS))
+    min_score = time.time() - (hours * 3600)
+    members = await app.state.store.zrangebyscore(
+        "fri:health:snapshots", min_score, "+inf"
+    )
     snapshots = []
     for m in members:
         try:
-            s = json.loads(m)
-            # Filter by time range
-            ts_str = s.get("timestamp", "")
-            from datetime import datetime, timezone
-            dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-            if dt.timestamp() >= min_score:
-                snapshots.append(s)
+            snapshots.append(json.loads(m))
         except Exception:
             pass
     return {"snapshots": snapshots, "count": len(snapshots)}
@@ -194,6 +201,89 @@ async def tclk():
 @app.get("/api/reputation")
 async def reputation():
     return await app.state.store.get("fri:reputation") or {"dids": []}
+
+
+# ---------------------------------------------------------------------------
+# Per-DID endpoints — Phase 4 drill-down (snapshot-first, live fallback)
+# ---------------------------------------------------------------------------
+
+
+def _find_did_entry(payload: dict | None, did: str) -> dict | None:
+    """Find a DID's entry in a snapshot payload (fri:dids / fri:reputation)."""
+    for entry in (payload or {}).get("dids", []):
+        if isinstance(entry, dict) and entry.get("did") == did:
+            return entry
+    return None
+
+
+async def _live_score(did: str) -> dict | None:
+    """Score a DID against the live in-memory indices.
+
+    Covers DIDs that became active after the last snapshot cycle (e.g.
+    brand-new agents) — the 30s snapshot will include them momentarily,
+    but a per-DID query should not have to wait. Returns None when the
+    collector is not ready or the DID is unknown to the live index.
+    """
+    collector = getattr(app.state, "collector", None)
+    if collector is None or not getattr(app.state, "collector_ready", False):
+        return None
+    if collector.did_index.get(did) is None:
+        return None
+    scorer = ReputationScorer(
+        collector.did_index, collector.kibble_index, collector.tclk_index
+    )
+    breakdown = scorer.score_did(did)
+    return breakdown.to_dict() if breakdown else None
+
+
+@app.get("/api/did/{did}/score")
+async def did_score(did: str):
+    """Per-DID reputation score with the full transparent breakdown.
+
+    Served from the cached fri:reputation snapshot; falls back to scoring
+    against the live indices for DIDs newer than the last snapshot.
+    404 when the DID is unknown to both.
+    """
+    rep = await app.state.store.get("fri:reputation")
+    entry = _find_did_entry(rep, did)
+    if entry is not None:
+        return entry
+    live = await _live_score(did)
+    if live is not None:
+        return live
+    raise HTTPException(status_code=404, detail="did_not_found")
+
+
+@app.get("/api/did/{did}/profile")
+async def did_profile(did: str):
+    """Per-DID profile: activity stats + reputation breakdown in one read.
+
+    Aggregated from the cached snapshots with the same live fallback as
+    /api/did/{did}/score. 404 only when the DID is unknown to both.
+    """
+    dids_payload = await app.state.store.get("fri:dids")
+    did_stats = _find_did_entry(dids_payload, did)
+    rep = await app.state.store.get("fri:reputation")
+    rep_entry = _find_did_entry(rep, did)
+
+    live_rep = None
+    if rep_entry is None:
+        live_rep = await _live_score(did)
+        if did_stats is None and live_rep is not None:
+            # The live index knows this DID even though the last snapshot
+            # didn't include it — expose its fresh activity stats too.
+            stats = app.state.collector.did_index.get(did)
+            if stats is not None:
+                did_stats = stats.to_dict()
+
+    if did_stats is None and rep_entry is None and live_rep is None:
+        raise HTTPException(status_code=404, detail="did_not_found")
+
+    return {
+        "did": did,
+        "did_stats": did_stats,
+        "reputation": rep_entry if rep_entry is not None else live_rep,
+    }
 
 
 # ---------------------------------------------------------------------------

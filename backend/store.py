@@ -98,6 +98,17 @@ class Store:
     async def zrange(self, key: str, start: int, end: int) -> list[str]:
         return await self._redis.zrange(key, start, end)
 
+    async def zrangebyscore(
+        self, key: str, min_score: float, max_score: float | str
+    ) -> list[str]:
+        """Score-bounded zset read (inclusive bounds, like Redis).
+
+        `max_score` accepts the Redis "+inf" sentinel for unbounded ranges —
+        used by /api/health/snapshots so a request never pulls the whole
+        sorted set just to discard most of it client-side.
+        """
+        return await self._redis.zrangebyscore(key, min_score, max_score)
+
     async def zremrangebyscore(self, key: str, min_score: float, max_score: float) -> None:
         await self._redis.zremrangebyscore(key, min_score, max_score)
 
