@@ -71,6 +71,8 @@ This guide covers deploying FRI to production using free-tier services. The arch
    | `FRI_HEALTH_INTERVAL` | `120` | Seconds between health checks |
    | `FRI_SNAPSHOT_INTERVAL` | `300` | Seconds between full snapshots |
    | `FRI_ROOMS_INTERVAL` | `300` | Seconds between room updates |
+   | `FRI_COLLECTOR_RETRY_S` | `30` | Seconds between collector retries while Redis is down |
+   | `FRI_SSE_PER_IP_LIMIT` | `5` | Max concurrent `/api/live` SSE streams per client IP |
 
 6. Deploy and verify:
    - `https://YOUR-SERVICE.onrender.com/api/health` should return `{"status": "ok"}`

@@ -21,7 +21,16 @@ from collector.did_index import DidIndex, DidStats
 from collector.kibble import KibbleIndex, KibbleJob
 from collector.tclk import TclkContract, TclkIndex
 
-from backend.app import app, counts, did_profile, did_score, health, health_snapshots, rooms
+from backend.app import (
+    app,
+    counts,
+    did_profile,
+    did_score,
+    health,
+    health_snapshots,
+    rooms,
+    sse_gate,
+)
 from backend.collector import CollectorLoop
 
 
@@ -324,3 +333,68 @@ class TestPerDidEndpoints:
                 return e.status_code
 
         assert asyncio.run(run()) == 404
+
+
+class TestSseGate:
+    def test_admits_up_to_limit_then_rejects(self):
+        gate = sse_gate.__class__(limit=3)
+        assert gate.enter("1.2.3.4") is True
+        assert gate.enter("1.2.3.4") is True
+        assert gate.enter("1.2.3.4") is True
+        assert gate.enter("1.2.3.4") is False  # at cap
+        assert gate.enter("5.6.7.8") is True   # other IPs unaffected
+
+    def test_leave_releases_slot_and_cleans_up(self):
+        gate = sse_gate.__class__(limit=2)
+        gate.enter("1.2.3.4")
+        gate.enter("1.2.3.4")
+        gate.leave("1.2.3.4")
+        assert gate.enter("1.2.3.4") is True
+        assert gate.enter("1.2.3.4") is False
+        gate.leave("1.2.3.4")
+        gate.leave("1.2.3.4")
+        assert gate.counts == {}  # no leak after the last disconnect
+
+    def test_leave_unknown_ip_is_noop(self):
+        gate = sse_gate.__class__(limit=2)
+        gate.leave("nobody")  # must not raise
+        assert gate.counts == {}
+
+    def test_limit_floor_is_one(self):
+        gate = sse_gate.__class__(limit=0)
+        assert gate.limit == 1
+
+    def test_live_endpoint_429_over_cap_and_recovers(self):
+        """Route-level: over-cap client gets 429; after its held slots are
+        released, the endpoint admits it again."""
+        from backend.app import live
+
+        class FakeRequest:
+            def __init__(self, ip):
+                self.headers = {"x-forwarded-for": f"{ip}, 10.0.0.1"}
+                self.client = None
+
+        held = sse_gate.__class__(limit=2)
+        original_gate, original_limit = sse_gate.counts, sse_gate.limit
+        sse_gate.limit = held.limit
+        sse_gate.counts = held.counts  # share state with a local handle
+        try:
+            async def run():
+                codes = []
+                for _ in range(2):
+                    resp = await live(FakeRequest("9.9.9.9"))
+                    codes.append(resp.status_code)  # StreamingResponse
+                resp = await live(FakeRequest("9.9.9.9"))
+                codes.append(resp.status_code)  # JSONResponse 429
+                # client disconnects → finally releases its slots
+                sse_gate.leave("9.9.9.9")
+                sse_gate.leave("9.9.9.9")
+                resp = await live(FakeRequest("9.9.9.9"))
+                codes.append(resp.status_code)
+                return codes
+
+            codes = asyncio.run(run())
+        finally:
+            sse_gate.limit = original_limit
+            sse_gate.counts = original_gate
+        assert codes == [200, 200, 429, 200]

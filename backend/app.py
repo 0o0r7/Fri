@@ -40,6 +40,49 @@ COLLECTOR_RETRY_S = float(os.environ.get("FRI_COLLECTOR_RETRY_S", "30"))
 # than 168h can never return more data — it only widened the scan range.
 MAX_SNAPSHOT_HOURS = 168
 
+# Cap on concurrent /api/live SSE streams per client IP. Every open stream
+# holds a Redis pub/sub connection and a task; a runaway tab farm (or a
+# naive scraper) can exhaust both. Tunable via env; a frontend opens one
+# stream per tab, so the default leaves headroom for a handful of tabs
+# behind one NAT address.
+SSE_PER_IP_LIMIT = int(os.environ.get("FRI_SSE_PER_IP_LIMIT", "5"))
+
+
+class SseGate:
+    """Concurrent SSE-connection counter per client IP.
+
+    enter() is check+increment in one synchronous step (no await between
+    them), so two simultaneous requests cannot both slip past the cap.
+    leave() runs in the stream's finally block, so disconnects — clean or
+    aborted — always release the slot. Counts live in process memory: a
+    restart resets them, which is the right failure mode for an
+    abuse-mitigation valve. Direct (non-proxied) clients can spoof
+    X-Forwarded-For to rotate buckets; that is accepted here — the gate
+    targets accidental runaway connections, not determined adversaries.
+    """
+
+    def __init__(self, limit: int) -> None:
+        self.limit = max(1, limit)
+        self.counts: dict[str, int] = {}
+
+    def enter(self, ip: str) -> bool:
+        """Try to take a slot; False when the client is at the cap."""
+        n = self.counts.get(ip, 0)
+        if n >= self.limit:
+            return False
+        self.counts[ip] = n + 1
+        return True
+
+    def leave(self, ip: str) -> None:
+        n = self.counts.get(ip, 0)
+        if n <= 1:
+            self.counts.pop(ip, None)
+        else:
+            self.counts[ip] = n - 1
+
+
+sse_gate = SseGate(SSE_PER_IP_LIMIT)
+
 
 async def _retry_collector_start(
     collector: CollectorLoop, store: Store, app: FastAPI
@@ -296,13 +339,29 @@ async def live(request: Request):
     """Server-Sent Events stream — fans out Redis pub/sub events.
 
     Event types: counts, feed, rooms, dids, kibble, tclk, reputation, health
+    Concurrent streams per client IP are capped (SseGate) — over the cap
+    answers 429 so the frontend falls back to REST polling gracefully.
     """
+    # Behind the Vercel rewrite the socket peer is Vercel's edge; the
+    # original client IP rides in X-Forwarded-For (first hop wins).
+    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
+        request.client.host if request.client else "unknown"
+    )
+    if not sse_gate.enter(ip):
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "too_many_streams",
+                "detail": f"max {sse_gate.limit} concurrent SSE streams per client",
+            },
+        )
 
     async def stream():
-        pubsub = app.state.store.pubsub()
-        await pubsub.subscribe(REDIS_CHANNEL)
-        last_heartbeat = time.time()
+        pubsub = None
         try:
+            pubsub = app.state.store.pubsub()
+            await pubsub.subscribe(REDIS_CHANNEL)
+            last_heartbeat = time.time()
             while True:
                 if await request.is_disconnected():
                     break
@@ -317,8 +376,13 @@ async def live(request: Request):
                     yield ": heartbeat\n\n"
                     last_heartbeat = time.time()
         finally:
-            await pubsub.unsubscribe(REDIS_CHANNEL)
-            await pubsub.close()
+            sse_gate.leave(ip)
+            if pubsub is not None:
+                try:
+                    await pubsub.unsubscribe(REDIS_CHANNEL)
+                    await pubsub.close()
+                except Exception:
+                    pass  # pub/sub cleanup is best-effort; slot already released
 
     return StreamingResponse(
         stream(),
