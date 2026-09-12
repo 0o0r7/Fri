@@ -88,6 +88,35 @@ KNOWN_CATEGORIES = frozenset({"build", "coordinate", "explain", "research", "rev
 KIBBLE_ROOMS = ("kibble",)
 
 
+def _int(value: Any, default: int = 0) -> int:
+    """Lenient int coercion for committed-JSON fields (None/garbage → default)."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return default
+
+
+def _synthetic_frames(
+    count: Any, dids: Optional[List[str]] = None, **base: Any
+) -> List[Dict[str, Any]]:
+    """Build placeholder frames for hydrated jobs.
+
+    `dids` (role-DID lists published in kibble.json) are consumed in order;
+    any shortfall is filled with did="" (unknown author). Fields that the
+    snapshot does not publish come from **base (ts/seq/body/...) placeholders.
+    """
+    dids = list(dids or [])
+    frames: List[Dict[str, Any]] = []
+    for i in range(_int(count)):
+        frame: Dict[str, Any] = {
+            "did": dids[i] if i < len(dids) else "",
+            "_synthetic": True,
+        }
+        frame.update(base)
+        frames.append(frame)
+    return frames
+
+
 # ---------------------------------------------------------------------------
 # Frame dataclasses — one per parsed frame type.
 # ---------------------------------------------------------------------------
@@ -415,19 +444,19 @@ class KibbleIndex:
             if job.poster_did:
                 bump(job.poster_did, "jobs_posted")
             for c in job.claims:
-                bump(c["did"], "jobs_claimed")
+                bump(c.get("did", ""), "jobs_claimed")
             for r in job.results:
-                bump(r["did"], "results_posted")
+                bump(r.get("did", ""), "results_posted")
             for d in job.deliveries:
-                bump(d["did"], "deliveries_made")
+                bump(d.get("did", ""), "deliveries_made")
             for a in job.accepts:
-                bump(a["did"], "accepts_given")
+                bump(a.get("did", ""), "accepts_given")
             for a in job.attestations:
-                bump(a["did"], "attestations_given")
+                bump(a.get("did", ""), "attestations_given")
                 if a.get("rating") == "useful":
-                    bump(a["did"], "attestations_useful")
+                    bump(a.get("did", ""), "attestations_useful")
                 elif a.get("rating") == "not":
-                    bump(a["did"], "attestations_not")
+                    bump(a.get("did", ""), "attestations_not")
 
             # Attestations received: poster gets credit/blame for the job;
             # deliverers also get the attestation applied to them.
@@ -483,6 +512,111 @@ class KibbleIndex:
             "jobs_by_category": category_counts,
             "jobs": [j.to_dict() for j in top],
         }
+
+    # -----------------------------------------------------------------
+    # Hydration (boot-time restore from committed batch JSON)
+    # -----------------------------------------------------------------
+
+    def hydrate(self, payload: Dict[str, Any]) -> int:
+        """Restore index state from a kibble.json-shaped payload (boot-time).
+
+        kibble.json publishes per-frame counts plus the role-DID lists
+        (claimer/deliverer/attester) rather than raw frames, so hydrate()
+        rebuilds each job's frame lists from placeholder frames that
+        preserve:
+
+          - the derived `state` (frame lists are non-empty in exactly the
+            priority order the `state` property checks them), so health
+            metrics like the kibble completion rate are correct from boot
+          - every per-job count (claims/results/deliveries/accepts/
+            attestations, useful/not)
+          - reputation-relevant attribution: poster, claimer, deliverer and
+            attester DIDs are restored verbatim, so deliveries_made and
+            useful/not_received_on_delivered keep feeding the work score.
+            Result/accept author DIDs are not published in the snapshot and
+            stay unknown ("") — did_stats() skips unknown authors, matching
+            "no attribution" rather than inventing one.
+
+        Fields not present in the snapshot (ts/seq/body/raw_text) are
+        placeholders; every rebuilt frame is marked "_synthetic": True.
+        One known drift: last_activity falls back to poster_ts because
+        frame timestamps are not published — it self-heals as live frames
+        arrive.
+
+        Entries already present are skipped (idempotent; live ingest wins).
+        Returns the number of jobs restored.
+        """
+        self._total_messages_sampled = max(
+            self._total_messages_sampled, _int(payload.get("total_messages_sampled"))
+        )
+        self._total_frames = max(
+            self._total_frames, _int(payload.get("total_frames"))
+        )
+        for kind, n in (payload.get("frames_by_kind") or {}).items():
+            self._frames_by_kind[kind] = max(
+                self._frames_by_kind.get(kind, 0), _int(n)
+            )
+
+        restored = 0
+        for je in payload.get("jobs", []):
+            if not isinstance(je, dict):
+                continue
+            job_id = je.get("job_id")
+            if not job_id or job_id in self._jobs:
+                continue
+            job = KibbleJob(
+                job_id=job_id,
+                category=je.get("category"),
+                prompt=je.get("prompt"),
+                poster_did=je.get("poster_did"),
+                poster_ts=je.get("poster_ts"),
+                poster_seq=je.get("poster_seq"),
+            )
+            job.claims = _synthetic_frames(
+                je.get("claims_count"), je.get("claimer_dids"),
+                ts="", seq=None, role=None, raw_text="",
+            )
+            job.results = _synthetic_frames(
+                je.get("results_count"), None,
+                ts="", seq=None, body=None, raw_text="",
+            )
+            job.deliveries = _synthetic_frames(
+                je.get("deliveries_count"), je.get("deliverer_dids"),
+                ts="", seq=None, body=None, raw_text="",
+            )
+            job.accepts = _synthetic_frames(
+                je.get("accepts_count"), None,
+                ts="", seq=None, body=None, raw_text="",
+            )
+
+            # Attestations: ratings are published only as aggregate
+            # useful/not counts. Assign them in snapshot order (the
+            # attester list follows frame order) and dump any surplus
+            # onto authorless frames so useful/not totals stay exact.
+            total_att = _int(je.get("attestations_count"))
+            pool = (
+                ["useful"] * _int(je.get("useful_count"))
+                + ["not"] * _int(je.get("not_count"))
+            )
+            pool += [None] * max(0, total_att - len(pool))
+            attesters = list(je.get("attester_dids") or [])
+            job.attestations = [
+                {
+                    "did": attesters[i] if i < len(attesters) else "",
+                    "ts": "",
+                    "seq": None,
+                    "rating": pool[i] if i < len(pool) else None,
+                    "ref": None,
+                    "body": "",
+                    "raw_text": "",
+                    "_synthetic": True,
+                }
+                for i in range(total_att)
+            ]
+
+            self._jobs[job_id] = job
+            restored += 1
+        return restored
 
     # Convenience properties
     @property

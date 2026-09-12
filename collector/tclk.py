@@ -67,6 +67,14 @@ KNOWN_RAILS = frozenset({
 })
 
 
+def _int(value: Any, default: int = 0) -> int:
+    """Lenient int coercion for committed-JSON fields (None/garbage → default)."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return default
+
+
 def parse_frame(text: str) -> Optional[dict]:
     """Try to parse a tclk1 frame from a single message text.
 
@@ -536,6 +544,183 @@ class TclkIndex:
             "receipts_by_outcome": outcome_counts,
             "contracts": [c.to_dict() for c in top],
         }
+
+    # ------------------------------------------------------------------
+    # Hydration (boot-time restore from committed batch JSON)
+    # ------------------------------------------------------------------
+
+    def hydrate(self, payload: Dict[str, Any]) -> int:
+        """Restore index state from a tclk.json-shaped payload (boot-time).
+
+        tclk.json publishes the full offer frame plus per-frame-type counts
+        and the payer/payee DIDs, so hydrate() rebuilds each contract with:
+
+          - the real offer frame — payer/payee/amount/asset/rails/lock_kind
+            all derive from it and round-trip exactly
+          - a synthetic accept frame when the contract progressed past
+            "proposed". Its `from` is chosen so the payer_did/payee_did
+            properties reproduce the published values for all three offer
+            shapes: role="payer" → accepter is the payee; role="payee" or
+            role missing → the payer_did property derives the payer from
+            the accept frame, so the accepter is the published payer.
+          - synthetic lock/reveal/refund/cancel/receipt/heartbeat frames so
+            per-type counts and the derived `state` round-trip exactly.
+            Lock/refund frames carry the payer, reveal frames the payee —
+            the roles did_stats() attributes them to; cancel/receipt
+            authors are not published and stay "" (no invented attribution).
+            The receipt outcome is restored verbatim.
+
+        Contracts whose offer id is also the id of a *different* (accepted)
+        contract are the raw offer-keyed entries that live ingest keeps in
+        parallel; they are restored with offer_linked_elsewhere=True so
+        did_stats() does not double-count the deal — identical to live
+        behavior after an accept links the offer.
+
+        Frame fields not published in the snapshot (seq, raw text, non-offer
+        authors) are placeholders; every rebuilt frame is marked
+        "_synthetic": True. Entries already present are skipped (idempotent;
+        live ingest wins — a replayed offer/accept hits the "first one wins"
+        guards in ingest_message). Returns the number of contracts restored.
+        """
+        self._total_messages_sampled = max(
+            self._total_messages_sampled, _int(payload.get("total_messages_sampled"))
+        )
+        self._total_frames = max(
+            self._total_frames, _int(payload.get("total_frames"))
+        )
+        self._parse_failures = max(
+            self._parse_failures, _int(payload.get("parse_failures"))
+        )
+        for ftype, n in (payload.get("frames_by_type") or {}).items():
+            self._frames_by_type[ftype] = max(
+                self._frames_by_type.get(ftype, 0), _int(n)
+            )
+
+        entries = [e for e in payload.get("contracts", []) if isinstance(e, dict)]
+
+        # Offer ids referenced by a *different* contract id → those offers
+        # were accepted (the accepted contract carries a copy of the frame).
+        accepted_offer_ids = set()
+        for e in entries:
+            oid = (e.get("offer_frame") or {}).get("id")
+            if oid and oid != e.get("contract_id"):
+                accepted_offer_ids.add(oid)
+
+        restored = 0
+        for e in entries:
+            cid = e.get("contract_id")
+            if not cid or cid in self._contracts:
+                continue
+            offer = e.get("offer_frame")
+            if isinstance(offer, dict):
+                offer = dict(offer)  # own copy — live ingest mutates frames
+                if "_ts" not in offer and e.get("offer_ts"):
+                    offer["_ts"] = e.get("offer_ts")
+            else:
+                offer = None
+            contract = TclkContract(
+                contract_id=cid,
+                offer=offer,
+                first_seen_ts=e.get("first_seen"),
+                last_activity_ts=e.get("last_activity"),
+            )
+            state = e.get("state") or "proposed"
+
+            if state != "proposed" and contract.accept is None:
+                role = (offer or {}).get("role")
+                if role == "payer":
+                    accepter = e.get("payee_did")
+                else:
+                    # payee-role or role-less offers: the accepter IS the payer
+                    accepter = e.get("payer_did")
+                contract.accept = {
+                    "type": "accept",
+                    "contract": cid,
+                    "ref": (offer or {}).get("id"),
+                    "from": accepter,
+                    "_ts": e.get("accept_ts"),
+                    "_synthetic": True,
+                }
+
+            payer = e.get("payer_did")
+            payee = e.get("payee_did")
+
+            n_locks = max(_int(e.get("lock_count")), 1 if state == "locked" else 0)
+            if n_locks:
+                contract.locks = [
+                    {"type": "lock", "from": payer, "_synthetic": True}
+                    for _ in range(n_locks)
+                ]
+
+            n_reveals = max(
+                _int(e.get("reveal_count")), 1 if state == "revealed" else 0
+            )
+            if n_reveals:
+                contract.reveals = [
+                    {"type": "reveal", "from": payee, "_synthetic": True}
+                    for _ in range(n_reveals)
+                ]
+
+            n_refunds = max(
+                _int(e.get("refund_count")), 1 if state == "refunded" else 0
+            )
+            if n_refunds:
+                contract.refunds = [
+                    {"type": "refund", "from": payer, "_synthetic": True}
+                    for _ in range(n_refunds)
+                ]
+
+            if _int(e.get("cancel_count")):
+                contract.cancels = [
+                    {"type": "cancel", "from": None, "_synthetic": True}
+                    for _ in range(_int(e.get("cancel_count")))
+                ]
+
+            if state in ("claimed", "receipted"):
+                # The state derives from receipts[0].outcome — restore the
+                # published outcome so the state property reproduces exactly.
+                outcome = state if state in KNOWN_OUTCOMES else None
+                n_receipts = max(_int(e.get("receipt_count")), 1)
+                contract.receipts = [
+                    {"type": "receipt", "from": None, "outcome": outcome, "_synthetic": True}
+                    for _ in range(n_receipts)
+                ]
+            elif _int(e.get("receipt_count")):
+                # refunded/cancelled states derive from refund/cancel frames
+                # (already synthesized above); receipts are rebuilt only when
+                # the snapshot actually published some, with the published
+                # outcome — so deals_refunded_as_payer attribution stays
+                # identical to a live-observed contract of the same shape.
+                contract.receipts = [
+                    {
+                        "type": "receipt",
+                        "from": None,
+                        "outcome": e.get("receipt_outcome"),
+                        "_synthetic": True,
+                    }
+                    for _ in range(_int(e.get("receipt_count")))
+                ]
+
+            if _int(e.get("heartbeat_count")):
+                contract.heartbeats = [
+                    {"type": "heartbeat", "from": None, "_synthetic": True}
+                    for _ in range(_int(e.get("heartbeat_count")))
+                ]
+
+            oid = (contract.offer or {}).get("id")
+            if oid and oid == cid and cid in accepted_offer_ids:
+                contract.offer_linked_elsewhere = True
+
+            self._contracts[cid] = contract
+            restored += 1
+
+        # Offer-id → contract-id aliases; accepted contracts win (they are
+        # keyed by the contract id later frames reference).
+        for cid, contract in self._contracts.items():
+            oid = (contract.offer or {}).get("id")
+            if oid and oid != cid:
+                self._offer_id_to_contract[oid] = cid
+        return restored
 
     # Convenience properties
     @property

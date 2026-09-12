@@ -163,6 +163,65 @@ class DidIndex:
             "dids": [s.to_dict() for s in top],
         }
 
+    def hydrate(self, payload: Dict[str, Any]) -> int:
+        """Restore index state from a dids.json-shaped payload (boot-time).
+
+        The live index used to start empty on every boot: counts collapsed
+        to whatever the seeded rooms saw recently, daily_active/new_dids in
+        health snapshots read ~total_dids (everything looked brand-new),
+        and reputation lost all activity history until the firehose
+        refilled it. Hydrating from the committed batch baseline fixes all
+        three without any extra technocore load (no additional requests).
+
+        Round-trips everything snapshot() publishes: messages_signed,
+        rooms_breakdown (per-room counts), first_seen/last_active, and
+        avg_message_length (re-encoded as total_text_chars so reputation
+        scoring is unchanged). Entries already present are skipped, so
+        hydrate() is idempotent and live ingest always wins for known DIDs.
+
+        Returns the number of DIDs restored.
+        """
+        try:
+            self._total_messages_sampled = max(
+                self._total_messages_sampled,
+                int(payload.get("total_messages_sampled") or 0),
+            )
+        except (TypeError, ValueError):
+            pass
+
+        restored = 0
+        for entry in payload.get("dids", []):
+            if not isinstance(entry, dict):
+                continue
+            did = entry.get("did")
+            if not did or did in self._dids:
+                continue
+            try:
+                messages = int(entry.get("messages_signed") or 0)
+            except (TypeError, ValueError):
+                messages = 0
+            rooms = dict(entry.get("rooms_breakdown") or {})
+            if not rooms:
+                # Legacy files without per-room counts: keep the room names
+                # (zero counts) so rooms_active_in still round-trips.
+                rooms = {
+                    r: 0 for r in (entry.get("rooms") or []) if isinstance(r, str)
+                }
+            try:
+                avg_len = float(entry.get("avg_message_length") or 0.0)
+            except (TypeError, ValueError):
+                avg_len = 0.0
+            self._dids[did] = DidStats(
+                did=did,
+                first_seen=entry.get("first_seen"),
+                last_active=entry.get("last_active"),
+                messages_signed=messages,
+                rooms=rooms,
+                total_text_chars=int(round(avg_len * messages)),
+            )
+            restored += 1
+        return restored
+
     # Convenience for the collector
     @property
     def total_dids(self) -> int:

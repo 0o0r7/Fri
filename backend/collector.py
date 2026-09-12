@@ -146,9 +146,28 @@ class CollectorLoop:
     # Seeding
     # ------------------------------------------------------------------
 
-    async def _seed_from_committed(self) -> None:
-        """Load committed JSON from data/ into Redis for instant frontend display."""
-        data_dir = Path(__file__).resolve().parent.parent / "data"
+    async def _seed_from_committed(self, data_dir: str | Path | None = None) -> None:
+        """Load committed JSON from data/ into Redis for instant frontend display.
+
+        Also hydrates the in-memory indices (dids/kibble/tclk) from the same
+        files — one read per file, two uses. Without hydration the live index
+        boots empty: counts collapse to whatever the 11 seeded rooms saw
+        recently, daily_active/new_dids health metrics read ~total_dids
+        (everything looks brand-new), and reputation loses all deal history
+        until the firehose refills it. Hydrating from the committed batch
+        baseline costs zero extra technocore requests.
+
+        Overlap note: messages present in BOTH the committed baseline and the
+        live seed window are counted twice (the batch JSON publishes no
+        per-message seq to dedup against). Boots are rare and the inflation
+        is bounded by one seed window — accepted in exchange for continuity.
+        Replay guards in ingest_message (first offer/poster wins, accept
+        skipped when one exists) keep re-ingested frames from duplicating
+        hydrated contracts/jobs.
+        """
+        data_dir = Path(data_dir) if data_dir else (
+            Path(__file__).resolve().parent.parent / "data"
+        )
         for name, key in [
             ("latest.json", "fri:rooms"),
             ("dids.json", "fri:dids"),
@@ -161,6 +180,21 @@ class CollectorLoop:
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
                     await self.store.set(key, data)
+                    if key == "fri:dids":
+                        log.info(
+                            "Hydrated did index: %d DIDs from %s",
+                            self.did_index.hydrate(data), name,
+                        )
+                    elif key == "fri:kibble":
+                        log.info(
+                            "Hydrated kibble index: %d jobs from %s",
+                            self.kibble_index.hydrate(data), name,
+                        )
+                    elif key == "fri:tclk":
+                        log.info(
+                            "Hydrated tclk index: %d contracts from %s",
+                            self.tclk_index.hydrate(data), name,
+                        )
                     log.info("Seeded %s from %s", key, name)
                 except Exception as e:
                     log.warning("Could not seed %s: %s", name, e)
