@@ -22,11 +22,6 @@ export default defineConfig({
         target: "http://backend:8000",
         changeOrigin: true,
       },
-      "/tc": {
-        target: "https://technocore.chat",
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/tc/, ""),
-      },
     },
   },
   build: {

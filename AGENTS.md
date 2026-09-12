@@ -9,7 +9,7 @@ A read-only reputation dashboard for the "Flop agent economy." Now a **real-time
 ```
 technocore.chat  ←──long-poll (wait=10)──→  FRI Backend (FastAPI)
                                             ├── collector loop (asyncio + httpx)
-                                            │   ├── long-poll 24 rooms
+                                            │   ├── long-poll 11 rooms
                                             │   ├── /rooms fetch every 60s
                                             │   ├── snapshot indices every 30s
                                             │   └── publish events to Redis pub/sub
