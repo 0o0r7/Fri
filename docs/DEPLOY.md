@@ -1,164 +1,190 @@
 # FRI Deployment Guide
 
-This guide covers deploying FRI to production. The frontend is a static Vite build; the collector runs on GitHub Actions every 2 hours and commits fresh JSON to the repo.
+This guide covers deploying FRI to production using free-tier services. The architecture has three runtime components plus a data pipeline.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  GitHub Actions (every 2h)                          │
-│  1. Run collector (python -m collector.main --once) │
-│  2. Sync data/ → web/public/data/                   │
-│  3. Run tests (pytest)                              │
-│  4. Commit JSON if changed                          │
-│  5. Build frontend (npm run build)                  │
-└──────────────────────┬──────────────────────────────┘
-                       │ commits JSON
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  GitHub repo (your-handle/fri)                      │
-│  - data/*.json (committed, 5 files)                 │
-│  - web/public/data/*.json (committed, synced copy)  │
-│  - web/dist/ (built by CI, not committed)           │
-└──────────────────────┬──────────────────────────────┘
-                       │ auto-deploy on push
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Static host (Vercel or Cloudflare Pages)           │
-│  - Serves web/dist/ as the site root                │
-│  - /data/*.json served with 2h cache + CORS *       │
-│  - /assets/* served with 1y immutable cache         │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  Vercel (Frontend — free tier)                            │
+│  Vite/React SPA, static build                             │
+│  vercel.json rewrites /api/* → Render backend             │
+│  Serves /data/*.json snapshots as static fallback        │
+└──────────────┬───────────────────────────┬───────────────┘
+               │ /api/* (REST + SSE)        │ /data/*.json (fallback)
+               ▼                            ▼
+┌──────────────────────────┐   ┌────────────────────────────┐
+│  Render (Backend — free)  │   │  Committed JSON in repo    │
+│  FastAPI + uvicorn        │   │  web/public/data/*.json     │
+│  collector.py long-poll   │   │  Updated by GitHub Actions │
+│  SSE fan-out via Redis    │   │  every 2h                  │
+└────────────┬─────────────┘   └────────────────────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│  Upstash Redis (free)     │
+│  TLS (rediss://)          │
+│  256MB · 500K cmd/mo     │
+└──────────────────────────┘
 ```
 
 ---
 
-## Option A: Vercel (recommended — simplest)
+## Step 1: Upstash Redis (free)
 
-### Prerequisites
-- GitHub account
-- Vercel account (free tier is enough)
-
-### Steps
-
-1. **Push the repo to GitHub:**
-   ```bash
-   cd /path/to/fri
-   git init
-   git add .
-   git commit -m "FRI — Flop Reputation Index"
-   git remote add origin https://github.com/YOUR_HANDLE/fri.git
-   git push -u origin main
+1. Create a free account at [upstash.com](https://upstash.com)
+2. Create a **Regional Database** (free tier: 256MB, 500K commands/month)
+3. Enable **TLS** (enabled by default on Upstash)
+4. Copy the connection string — it should look like:
    ```
-
-2. **Import to Vercel:**
-   - Go to [vercel.com/new](https://vercel.com/new)
-   - Import your `fri` repo
-   - Set **Root Directory** to `web`
-   - Build command: `npm run build` (auto-detected)
-   - Output directory: `dist` (auto-detected)
-   - Click **Deploy**
-
-3. **Done.** Vercel auto-deploys on every push to `main`.
-
-4. **Custom domain (optional):**
-   - Go to Project Settings → Domains
-   - Add your domain (e.g., `fri.yourdomain.com`)
-   - Vercel handles SSL automatically
-
-### Why Vercel
-- Zero config for Vite projects
-- Free tier covers FRI easily (static site, no server functions)
-- Edge cache for JSON files
-- Auto-deploy on push
+   rediss://default:PASSWORD@HOST.upstash.io:6379
+   ```
+   > **Important:** The scheme must be `rediss://` (two s's) for TLS. Using `redis://` will cause `Connection closed by server` errors.
 
 ---
 
-## Option B: Cloudflare Pages
+## Step 2: Render Backend (free)
 
-### Prerequisites
-- GitHub account
-- Cloudflare account (free tier is enough)
+1. Create a free account at [render.com](https://render.com)
+2. Create a new **Web Service** (free tier)
+3. Connect your GitHub repo
+4. Configure:
+   - **Root Directory:** (repo root)
+   - **Runtime:** Python 3
+   - **Build Command:**
+     ```bash
+     pip install --upgrade pip && pip install -r backend/requirements.txt
+     ```
+   - **Start Command:**
+     ```bash
+     uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+     ```
+   - **Health Check Path:** `/api/health`
+5. Set environment variables:
 
-### Steps
+   | Variable | Value | Notes |
+   |----------|-------|-------|
+   | `REDIS_URL` | `rediss://default:PASSWORD@HOST.upstash.io:6379` | Must use `rediss://` for TLS |
+   | `FRI_COUNTS_INTERVAL` | `120` | Seconds between count updates (Upstash budget) |
+   | `FRI_HEALTH_INTERVAL` | `120` | Seconds between health checks |
+   | `FRI_SNAPSHOT_INTERVAL` | `300` | Seconds between full snapshots |
+   | `FRI_ROOMS_INTERVAL` | `300` | Seconds between room updates |
 
-1. **Push the repo to GitHub** (same as Vercel step 1)
+6. Deploy and verify:
+   - `https://YOUR-SERVICE.onrender.com/api/health` should return `{"status": "ok"}`
+   - Logs should show `technocore.chat` HTTP 200 responses
 
-2. **Create a Cloudflare Pages project:**
-   - Go to [pages.cloudflare.com](https://pages.cloudflare.com)
-   - Click **Create a project** → **Connect to Git**
-   - Select your `fri` repo
-   - Set **Root directory** to `web`
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Click **Save and Deploy**
+### Render URL
 
-3. **Done.** Cloudflare auto-deploys on every push to `main`.
+On the free tier, your service URL is `https://<service-name>.onrender.com`. The service name is set when creating the service. Choose a professional name like `flop-reputation-index` or `fri-oracle`.
 
-4. **Custom domain (optional):**
-   - Go to Project → Custom domains
-   - Add your domain
-   - Cloudflare handles SSL automatically
+> **Custom domains** (e.g., `api.fri.example.com`) require a Render paid plan ($7/month). The free tier `*.onrender.com` subdomain is sufficient for FRI.
 
-### Why Cloudflare Pages
-- Unlimited requests on free tier
-- Global CDN with 300+ locations
-- `_headers` file already in `web/` for cache + CORS config
+### Free-tier caveats
+
+- Render free spins down after ~15 min idle; wake-up takes ~50s
+- The frontend's 60s re-probe automatically upgrades from static to live when the backend wakes
+- An open SSE stream with 15s heartbeats counts as traffic and keeps the instance warm
 
 ---
 
-## GitHub Actions (automated collector)
+## Step 3: Vercel Frontend (free)
+
+1. Create a free account at [vercel.com](https://vercel.com)
+2. Import your GitHub repo
+3. Configure:
+   - **Root Directory:** `web`
+   - **Build Command:** `npm run build` (auto-detected)
+   - **Output Directory:** `dist` (auto-detected)
+4. Update `web/vercel.json` — set the Render backend URL:
+   ```json
+   {
+     "source": "/api/:path*",
+     "destination": "https://YOUR-SERVICE.onrender.com/api/:path*"
+   }
+   ```
+5. Deploy
+
+### Verification
+
+After deployment:
+
+- [ ] `https://your-vercel-url/` loads the FRI dashboard
+- [ ] Dashboard shows **LIVE** badge (backend connected)
+- [ ] Network tab shows EventSource connected to `/api/live`
+- [ ] `https://your-vercel-url/data/latest.json` returns valid JSON
+- [ ] With backend stopped: dashboard shows **OFFLINE** badge, renders from snapshots (no error screen)
+- [ ] All tabs work (Rooms, DIDs, Kibble, TCLK, Reputation)
+
+---
+
+## Step 4: GitHub Actions (automated data pipeline)
 
 The workflow at `.github/workflows/update.yml` runs every 2 hours:
 
 1. **Collector:** `python -m collector.main --once` — fetches from technocore.chat, produces 5 JSON files
 2. **Sync:** `bash scripts/sync_data.sh` — copies `data/*.json` → `web/public/data/`
-3. **Tests:** `pytest -q` — verifies scoring logic
-4. **Commit:** If JSON changed, commits to `main` with message `chore(data): update FRI rankings`
-5. **Build:** `npm run build` — verifies the frontend compiles
-
-The commit triggers Vercel/Cloudflare to redeploy with fresh data.
+3. **Tests:** `pytest -q`
+4. **Commit:** If JSON changed, commits to `main` with message `chore(data): update FRI ...`
+5. The commit triggers Vercel to redeploy with fresh fallback data
 
 ### Manual trigger
-You can also trigger the workflow manually from GitHub:
-- Go to repo → Actions → "Update FRI" → Run workflow
+
+Go to repo → Actions → "Update FRI" → Run workflow.
 
 ### Adjusting the schedule
+
 Edit `.github/workflows/update.yml`:
 ```yaml
 on:
   schedule:
     - cron: "0 */2 * * *"  # every 2 hours (default)
     # - cron: "0 * * * *"   # every hour (more frequent)
-    # - cron: "0 */6 * * *" # every 6 hours (less frequent)
 ```
 
 ---
 
-## Custom domain (GitHub Education credits)
+## Upstash Command Budget
 
-If you have GitHub Student Developer Pack:
-1. Register a domain through Namecheap/other registrar (free with Education Pack)
-2. Point DNS to your hosting provider:
-   - **Vercel:** Add CNAME `fri → cname.vercel-dns.com`
-   - **Cloudflare:** Add CNAME `fri → your-project.pages.dev`
-3. Add the domain in your hosting provider's dashboard
+The free tier allows 500K commands/month. With the recommended intervals:
+
+| Loop | Interval | Commands/day | Commands/month |
+|------|----------|-------------|----------------|
+| Counts | 120s | ~720 | ~21.6K |
+| Health | 120s | ~720 | ~21.6K |
+| Snapshot | 300s | ~288 | ~8.6K |
+| Rooms | 300s | ~288 | ~8.6K |
+| **Total** | | **~2K** | **~60K** |
+
+Well within the 500K limit. SSE events are pushed the moment data changes — no extra polling cost.
 
 ---
 
-## Local development
+## Local Development
+
+### Docker (recommended)
 
 ```bash
-# Collector
-cd fri
+docker compose -f docker-compose.base44.yml up -d
+```
+
+Frontend on `http://localhost:3000`, backend on `http://localhost:8000`, Redis included.
+
+### Manual
+
+```bash
+# Terminal 1 — Redis
+redis-server
+
+# Terminal 2 — Backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m collector.main --once
+uvicorn backend.app:app --host 0.0.0.0 --port 8000
 
-# Frontend
+# Terminal 3 — Frontend
 cd web
 npm install
 npm run dev    # → http://localhost:5173
@@ -166,39 +192,27 @@ npm run dev    # → http://localhost:5173
 
 ---
 
-## Verification checklist
-
-After deployment, verify:
-
-- [ ] `https://your-domain/` loads the FRI dashboard
-- [ ] `https://your-domain/data/latest.json` returns valid JSON
-- [ ] `https://your-domain/data/dids.json` returns valid JSON
-- [ ] `https://your-domain/data/kibble.json` returns valid JSON
-- [ ] `https://your-domain/data/tclk.json` returns valid JSON
-- [ ] `https://your-domain/data/reputation.json` returns valid JSON
-- [ ] All 5 tabs work (Rooms, DIDs, Kibble, TCLK, Reputation)
-- [ ] DID lookup works (paste a `did:key:...` in the nav search bar)
-- [ ] GitHub Actions runs successfully every 2 hours
-- [ ] JSON data refreshes after each Actions run
-
----
-
 ## Troubleshooting
 
-### Build fails on Vercel/Cloudflare
-- Check that **Root Directory** is set to `web` (not the repo root)
-- Check that Node version is 22+ (set in `web/package.json` engines if needed)
+### `Connection closed by server` (Render)
+
+The `REDIS_URL` uses `redis://` instead of `rediss://`. Upstash requires TLS. Change the scheme to `rediss://` in Render environment variables.
+
+### Frontend shows OFFLINE but backend is running
+
+Check `web/vercel.json` — the `destination` URL must match your actual Render service URL. The rewrite must repeat `/api/`:
+```json
+"destination": "https://YOUR-SERVICE.onrender.com/api/:path*"
+```
 
 ### JSON data is stale
-- Check GitHub Actions tab — did the last run succeed?
-- Check that `data/*.json` was committed (look at recent commits)
-- Manually trigger the workflow: Actions → "Update FRI" → Run workflow
+
+Check GitHub Actions tab — did the last run succeed? Manually trigger: Actions → "Update FRI" → Run workflow.
 
 ### CORS errors
-- The `vercel.json` and `_headers` files set `Access-Control-Allow-Origin: *` on `/data/*`
-- If you're on a different host, add this header manually for `/data/*.json`
 
-### Collector fails
-- Check that `flopkit` is installed (it's in `requirements.txt` as a git dependency)
-- Check that technocore.chat is reachable (it's been up since Aug 2026)
-- Run locally: `python -m collector.main --once` and check the logs
+The `vercel.json` and `_headers` files set `Access-Control-Allow-Origin: *` on `/data/*`. If using a different host, add this header manually.
+
+### Build fails on Vercel
+
+Ensure **Root Directory** is set to `web` (not the repo root). Check Node version is 22+.
