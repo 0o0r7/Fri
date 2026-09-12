@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { drag } from "d3-drag";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation } from "d3-force";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity } from "d3-zoom";
@@ -24,6 +25,9 @@ type GraphNode = {
   y: number;
   vx: number;
   vy: number;
+  // d3-drag pin coordinates
+  fx?: number;
+  fy?: number;
 };
 
 type GraphLink = {
@@ -57,7 +61,16 @@ export function NetworkGraph({
   const [roomFilter, setRoomFilter] = useState<string | null>(null);
   const [width, setWidth] = useState(800);
   const [height, setHeight] = useState(500);
-  const [tick, setTick] = useState(0);
+  // Direct-DOM painting: tick attributes are written straight to elements so
+  // the 60fps animation triggers zero React re-renders (the original version
+  // setState'd on every tick — ~2000 re-renders — and froze the tab).
+  const nodesRef = useRef<GraphNode[]>([]);
+  const linksRef = useRef<GraphLink[]>([]);
+  const nodeEls = useRef(new Map<string, SVGGElement>());
+  const linkEls = useRef(new Map<number, SVGLineElement>());
+  // Last-known positions: data/filter changes morph the layout instead of
+  // scattering everything into a fresh random settle.
+  const posRef = useRef(new Map<string, { x: number; y: number }>());
 
   // Build rep map
   const repMap = useMemo(() => {
@@ -108,9 +121,10 @@ export function NetworkGraph({
     const graphNodes: GraphNode[] = filtered.map((d, i) => {
       const rep = repMap.get(d.did);
       const score = rep?.reputation_score ?? 0;
-      // Deterministic golden-angle (phyllotaxis) starting disc — evenly
-      // spread, stable across reloads. The simulation is pre-warmed below so
-      // users always see a settled layout.
+      // Brand-new nodes start on a deterministic golden-angle (phyllotaxis)
+      // disc; previously-seen nodes keep their last painted position so
+      // data refreshes gently morph the graph instead of re-scattering it.
+      const prev = posRef.current.get(d.did);
       const startA = i * 2.399963229728653;
       const startR = Math.sqrt((i + 0.5) / Math.max(1, filtered.length)) * Math.min(width, height) * 0.35;
       return {
@@ -119,8 +133,8 @@ export function NetworkGraph({
         reputation: rep,
         score,
         band: rep ? reputationBand(score) : "low",
-        x: width / 2 + Math.cos(startA) * startR,
-        y: height / 2 + Math.sin(startA) * startR,
+        x: prev?.x ?? width / 2 + Math.cos(startA) * startR,
+        y: prev?.y ?? height / 2 + Math.sin(startA) * startR,
         vx: 0,
         vy: 0,
       };
@@ -147,6 +161,8 @@ export function NetworkGraph({
 
     return { nodes: graphNodes, links: graphLinks };
   }, [didIndex, repMap, bandFilter, roomFilter, width, height]);
+  nodesRef.current = nodes;
+  linksRef.current = links;
 
   // Resize observer
   useEffect(() => {
@@ -161,62 +177,89 @@ export function NetworkGraph({
     return () => ro.disconnect();
   }, []);
 
-  // Run force simulation
+  // Run the force simulation LIVE: d3's internal timer animates the layout
+  // into place (~3s settle) and the tick handler paints straight to the DOM
+  // (no React re-render per frame). Data/filter changes rebuild `nodes` with
+  // preserved positions, so refreshes morph gently. Nodes are draggable via
+  // d3-drag: dragging pins the node and re-heats the simulation; d3-drag also
+  // blocks the event from reaching d3-zoom (no background pan while dragging
+  // a node) and suppresses the click that follows a real drag.
   useEffect(() => {
     if (nodes.length === 0) return;
 
+    // Drop saved positions for nodes that left the graph
+    const keep = new Set(nodes.map((n) => n.id));
+    for (const key of posRef.current.keys()) {
+      if (!keep.has(key)) posRef.current.delete(key);
+    }
+
     const sim = forceSimulation<GraphNode>(nodes)
-      .force("charge", forceManyBody().strength(-140))
+      .force("charge", forceManyBody().strength(-160))
       .force(
         "link",
         forceLink<GraphNode, GraphLink>(links)
           .id((d) => d.id)
-          .distance((l) => 70 + 130 / l.weight)
+          .distance((l) => 60 + 120 / l.weight)
           .strength((l) => Math.min(0.5, 0.04 + 0.06 * l.weight)),
       )
-      .force("collide", forceCollide<GraphNode>((d) => nodeRadius(d) + 6).iterations(2))
+      .force("collide", forceCollide<GraphNode>((d) => nodeRadius(d) + 8).iterations(2))
       // Gentle gravity instead of forceCenter: it also holds disconnected
       // single-node components near the main cluster instead of letting
       // charge repulsion fling them to the canvas edges.
-      .force("x", forceX<GraphNode>(width / 2).strength(0.045))
-      .force("y", forceY<GraphNode>(height / 2).strength(0.06))
-      .alphaDecay(0.02);
+      .force("x", forceX<GraphNode>(width / 2).strength(0.05))
+      .force("y", forceY<GraphNode>(height / 2).strength(0.07));
 
     simRef.current = sim;
 
-    // Pre-warm the layout synchronously, then stop. Previously the sim ran
-    // ~2000+ ticks with a React re-render per tick, so the tab showed a
-    // minutes-long random mid-flight animation and often froze clumped.
-    sim.tick(280);
-    sim.on("tick", null);
-    sim.stop();
-
-    // Fit the settled layout into the viewport: scale + translate node
-    // coordinates so the whole graph (incl. outlier components) is visible
-    // and roughly centered. Links reference the same node objects, so they
-    // follow automatically.
-    if (width > 160 && height > 160) {
-      const pad = 60;
-      const xs = nodes.map((n) => n.x);
-      const ys = nodes.map((n) => n.y);
-      const bx = Math.min(...xs) - pad;
-      const by = Math.min(...ys) - pad;
-      const bw = Math.max(...xs) + pad - bx;
-      const bh = Math.max(...ys) + pad - by;
-      if (bw > 0 && bh > 0) {
-        const k = Math.min((width - 2 * pad) / bw, (height - 2 * pad) / bh, 1.15);
-        const cx = bx + bw / 2;
-        const cy = by + bh / 2;
-        for (const n of nodes) {
-          n.x = (n.x - cx) * k + width / 2;
-          n.y = (n.y - cy) * k + height / 2;
-        }
+    const paint = () => {
+      for (const n of nodesRef.current) {
+        posRef.current.set(n.id, { x: n.x, y: n.y });
+        const el = nodeEls.current.get(n.id);
+        if (el) el.setAttribute("transform", `translate(${n.x},${n.y})`);
       }
-    }
+      const ls = linksRef.current;
+      for (let i = 0; i < ls.length; i++) {
+        const el = linkEls.current.get(i);
+        if (!el) continue;
+        const s = ls[i].source as GraphNode;
+        const t = ls[i].target as GraphNode;
+        el.setAttribute("x1", String(s.x));
+        el.setAttribute("y1", String(s.y));
+        el.setAttribute("x2", String(t.x));
+        el.setAttribute("y2", String(t.y));
+      }
+    };
+    sim.on("tick", paint);
+    paint();
 
-    setTick((t) => t + 1);
+    // d3-drag's event.x/y come from the zoom-layer <g>'s screen CTM, i.e.
+    // they are already in graph coordinates with pan/zoom factored in.
+    // Index-based .data() join: React renders these <g>s (no bound datum),
+    // so a key function would be called with undefined and throw. DOM order
+    // always matches the `nodes` array (same array renders both).
+    select(svgRef.current)
+      .selectAll<SVGGElement, GraphNode>("g.node")
+      .data(nodes)
+      .call(
+        drag<SVGGElement, GraphNode>()
+          .on("start", (_event, d) => {
+            sim.alphaTarget(0.25).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          })
+          .on("drag", (event, d) => {
+            d.fx = event.x;
+            d.fy = event.y;
+          })
+          .on("end", (_event, d) => {
+            sim.alphaTarget(0);
+            d.fx = undefined;
+            d.fy = undefined;
+          }),
+      );
 
     return () => {
+      sim.on("tick", null);
       sim.stop();
       simRef.current = null;
     };
@@ -239,13 +282,9 @@ export function NetworkGraph({
     };
   }, [svgReady]);
 
-  // Debounced re-render trigger
-  const tickRef = useRef(0);
-  tickRef.current = tick;
-
   function nodeRadius(d: GraphNode): number {
-    const min = 6;
-    const max = 28;
+    const min = 5;
+    const max = 20;
     return min + (max - min) * d.score;
   }
 
@@ -363,6 +402,10 @@ export function NetworkGraph({
                 return (
                   <line
                     key={i}
+                    ref={(el) => {
+                      if (el) linkEls.current.set(i, el);
+                      else linkEls.current.delete(i);
+                    }}
                     x1={s.x}
                     y1={s.y}
                     x2={t.x}
@@ -378,6 +421,11 @@ export function NetworkGraph({
               {nodes.map((n) => (
                 <g
                   key={n.id}
+                  className="node"
+                  ref={(el) => {
+                    if (el) nodeEls.current.set(n.id, el);
+                    else nodeEls.current.delete(n.id);
+                  }}
                   transform={`translate(${n.x},${n.y})`}
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(e) => {
@@ -432,7 +480,7 @@ export function NetworkGraph({
       <footer className="relative z-10 border-t border-border px-4 py-3 sm:px-6">
         <div className="mx-auto max-w-screen-2xl">
           <p className="font-mono text-[11px] text-faint">
-            Graph derived from shared room membership in DidIndex · top {MAX_NODES} agents by reputation · pan & zoom enabled
+            Top {MAX_NODES} agents by reputation · edge = shared rooms · drag nodes · scroll to zoom · drag background to pan
           </p>
         </div>
       </footer>
