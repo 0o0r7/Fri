@@ -4,8 +4,11 @@ Replaces the batch `collector/main.py` with a long-running async process that:
 1. Long-polls technocore.chat rooms using wait=10 (connection-held)
 2. Periodically fetches /rooms for metadata + scoring
 3. Feeds messages through existing scoring/indexing modules
-4. Snapshots to Redis + publishes events via pub/sub
+4. Snapshots to Redis + fans events out to SSE subscribers
 5. Gracefully degrades when technocore is unreachable
+
+Event fan-out defaults to the in-process EventBus (zero Redis commands for
+pub/sub); FRI_EVENT_BUS=redis restores the legacy Redis pub/sub mode.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from collector.reputation import ReputationScorer
 from collector.score import score_room
 from collector.tclk import TclkIndex
 
+from .eventbus import EventBus
 from .store import Store
 
 log = logging.getLogger("fri.collector")
@@ -73,11 +77,18 @@ def _now() -> str:
 
 
 class CollectorLoop:
-    """Continuous async collector that feeds live data to Redis + pub/sub."""
+    """Continuous async collector: live data to Redis + SSE event fan-out."""
 
-    def __init__(self, store: Store, base_url: str = "https://technocore.chat") -> None:
+    def __init__(
+        self,
+        store: Store,
+        base_url: str = "https://technocore.chat",
+        event_bus: EventBus | None = None,
+    ) -> None:
         self.store = store
         self.base_url = base_url
+        # None → legacy Redis pub/sub fan-out (FRI_EVENT_BUS=redis)
+        self.event_bus = event_bus
         self.client = httpx.AsyncClient(
             base_url=base_url,
             headers={"User-Agent": f"{USER_AGENT} (live)"},
@@ -251,6 +262,25 @@ class CollectorLoop:
             log.warning("Failed to seed room %s: %s", room, e)
 
     # ------------------------------------------------------------------
+    # Event fan-out
+    # ------------------------------------------------------------------
+
+    async def _emit(self, event: dict[str, Any]) -> None:
+        """Fan an event out to SSE subscribers.
+
+        Default (event_bus present, FRI_EVENT_BUS=memory): in-process bus —
+        zero Redis commands, and delivery cannot fail on a Redis error (a
+        failed publish here used to abort the poll loop before last_seq was
+        updated, re-fetching and re-ingesting the same messages).
+        event_bus=None (FRI_EVENT_BUS=redis): legacy Redis pub/sub, kept for
+        multi-process deployments.
+        """
+        if self.event_bus is not None:
+            await self.event_bus.publish(event)
+        else:
+            await self.store.publish(REDIS_CHANNEL, event)
+
+    # ------------------------------------------------------------------
     # Long-polling
     # ------------------------------------------------------------------
 
@@ -279,8 +309,7 @@ class CollectorLoop:
                 if messages:
                     for msg in messages:
                         self._ingest(room, msg)
-                        await self.store.publish(
-                            REDIS_CHANNEL,
+                        await self._emit(
                             {
                                 "type": "feed",
                                 "room": room,
@@ -388,28 +417,28 @@ class CollectorLoop:
             "rooms": scored[:TOP_N],
         }
         await self.store.set("fri:rooms", snapshot)
-        await self.store.publish(REDIS_CHANNEL, {"type": "rooms", **snapshot})
+        await self._emit({"type": "rooms", **snapshot})
 
     async def _snapshot_dids(self) -> None:
         snapshot = self.did_index.snapshot(top_limit=500)
         await self.store.set("fri:dids", snapshot)
-        await self.store.publish(REDIS_CHANNEL, {"type": "dids", **snapshot})
+        await self._emit({"type": "dids", **snapshot})
 
     async def _snapshot_kibble(self) -> None:
         snapshot = self.kibble_index.snapshot(top_limit=500)
         await self.store.set("fri:kibble", snapshot)
-        await self.store.publish(REDIS_CHANNEL, {"type": "kibble", **snapshot})
+        await self._emit({"type": "kibble", **snapshot})
 
     async def _snapshot_tclk(self) -> None:
         snapshot = self.tclk_index.snapshot(top_limit=500)
         await self.store.set("fri:tclk", snapshot)
-        await self.store.publish(REDIS_CHANNEL, {"type": "tclk", **snapshot})
+        await self._emit({"type": "tclk", **snapshot})
 
     async def _snapshot_reputation(self) -> None:
         scorer = ReputationScorer(self.did_index, self.kibble_index, self.tclk_index)
         snapshot = scorer.snapshot(top_limit=500)
         await self.store.set("fri:reputation", snapshot)
-        await self.store.publish(REDIS_CHANNEL, {"type": "reputation", **snapshot})
+        await self._emit({"type": "reputation", **snapshot})
 
     async def _publish_counts(self) -> None:
         rep = await self.store.get("fri:reputation") or {}
@@ -421,7 +450,7 @@ class CollectorLoop:
             "total_dids_scored": rep.get("total_dids_scored", 0),
         }
         await self.store.set("fri:counts", counts)
-        await self.store.publish(REDIS_CHANNEL, {"type": "counts", **counts})
+        await self._emit({"type": "counts", **counts})
 
     async def _publish_health(self) -> None:
         stale = not self.technocore_ok or (time.time() - self.last_success > 60)
@@ -433,7 +462,7 @@ class CollectorLoop:
             "timestamp": _now(),
         }
         await self.store.set("fri:health", health)
-        await self.store.publish(REDIS_CHANNEL, {"type": "health", **health})
+        await self._emit({"type": "health", **health})
 
     async def _health_snapshot_loop(self) -> None:
         """Every 5 min: write aggregate ecosystem metrics to Redis sorted set."""

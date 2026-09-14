@@ -1,7 +1,9 @@
 """FastAPI app — REST endpoints + SSE live stream.
 
 Serves cached snapshots from Redis (instant, no technocore round-trip) and
-a single multiplexed SSE endpoint that fans out Redis pub/sub events.
+a single multiplexed SSE endpoint. Event fan-out defaults to the in-process
+EventBus (FRI_EVENT_BUS=memory, zero Redis pub/sub commands); the legacy
+Redis pub/sub fan-out remains available via FRI_EVENT_BUS=redis.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 from collector.reputation import ReputationScorer
 
 from .collector import REDIS_CHANNEL, CollectorLoop
+from .eventbus import EventBus
 from .store import Store
 
 logging.basicConfig(
@@ -36,12 +39,21 @@ BASE_URL = os.environ.get("TECHNOCORE_BASE_URL", "https://technocore.chat")
 
 COLLECTOR_RETRY_S = float(os.environ.get("FRI_COLLECTOR_RETRY_S", "30"))
 
+# SSE event fan-out: "memory" (default) uses the in-process EventBus — the
+# single-instance deployment needs no Redis pub/sub, and cutting it removes
+# the largest per-command consumer (per-message PUBLISH, also replayed in
+# bursts at every boot). "redis" restores pub/sub fan-out for multi-process
+# deployments. Any other value falls back to memory with a warning.
+EVENT_BUS_MODE = os.environ.get("FRI_EVENT_BUS", "memory").strip().lower()
+if EVENT_BUS_MODE not in ("memory", "redis"):
+    EVENT_BUS_MODE = "memory"
+
 # The collector prunes fri:health:snapshots to 7 days, so asking for more
 # than 168h can never return more data — it only widened the scan range.
 MAX_SNAPSHOT_HOURS = 168
 
 # Cap on concurrent /api/live SSE streams per client IP. Every open stream
-# holds a Redis pub/sub connection and a task; a runaway tab farm (or a
+# holds a subscription slot and a task; a runaway tab farm (or a
 # naive scraper) can exhaust both. Tunable via env; a frontend opens one
 # stream per tab, so the default leaves headroom for a handful of tabs
 # behind one NAT address.
@@ -113,10 +125,13 @@ async def _retry_collector_start(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     store = Store(REDIS_URL)
-    collector = CollectorLoop(store, BASE_URL)
+    event_bus = EventBus() if EVENT_BUS_MODE == "memory" else None
+    collector = CollectorLoop(store, BASE_URL, event_bus=event_bus)
     app.state.store = store
+    app.state.event_bus = event_bus
     app.state.collector = collector
     app.state.collector_ready = False
+    log.info("Event bus mode: %s", EVENT_BUS_MODE)
 
     try:
         # Fast pre-check so a dead Redis fails in <1s instead of after the
@@ -138,9 +153,10 @@ async def lifespan(app: FastAPI):
         if isinstance(e, RedisConnectionError) and "closed by server" in str(e).lower():
             log.critical(
                 "HINT: 'Connection closed by server' usually means REDIS_URL is "
-                "wrong. Upstash needs rediss://default:<PASSWORD>@<host>:6379 "
-                "(the Redis URL from the Upstash console — not redis:// and not "
-                "the REST https:// URL)."
+                "wrong. Managed providers require rediss:// with the full "
+                "credential — Upstash: rediss://default:<PASSWORD>@<host>:6379 "
+                "(the Redis URL, not the REST URL); Aiven Valkey: the Service "
+                "URI from the service Overview page."
             )
         app.state._collector_retry_task = asyncio.create_task(
             _retry_collector_start(collector, store, app)
@@ -334,9 +350,17 @@ async def did_profile(did: str):
 # ---------------------------------------------------------------------------
 
 
+def _sse_frame(data: dict | None) -> str | None:
+    """Format one SSE frame (pops the event type off a private event copy)."""
+    if data is None:
+        return None
+    event_type = data.pop("type", "message")
+    return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+
+
 @app.get("/api/live")
 async def live(request: Request):
-    """Server-Sent Events stream — fans out Redis pub/sub events.
+    """Server-Sent Events stream — fans out live collector events.
 
     Event types: counts, feed, rooms, dids, kibble, tclk, reputation, health
     Concurrent streams per client IP are capped (SseGate) — over the cap
@@ -357,26 +381,41 @@ async def live(request: Request):
         )
 
     async def stream():
+        bus = getattr(app.state, "event_bus", None)
+        queue: asyncio.Queue | None = None
         pubsub = None
-        try:
+        if bus is not None:
+            queue = await bus.subscribe()
+        else:
             pubsub = app.state.store.pubsub()
             await pubsub.subscribe(REDIS_CHANNEL)
+        try:
             last_heartbeat = time.time()
             while True:
                 if await request.is_disconnected():
                     break
-                message = await pubsub.get_message(
-                    timeout=1.0, ignore_subscribe_messages=True
-                )
-                if message and message["type"] == "message":
-                    data = json.loads(message["data"])
-                    event_type = data.pop("type", "message")
-                    yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+                data: dict | None = None
+                if queue is not None:
+                    try:
+                        data = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    except asyncio.TimeoutError:
+                        pass
+                else:
+                    message = await pubsub.get_message(
+                        timeout=1.0, ignore_subscribe_messages=True
+                    )
+                    if message and message["type"] == "message":
+                        data = json.loads(message["data"])
+                frame = _sse_frame(data)
+                if frame is not None:
+                    yield frame
                 elif time.time() - last_heartbeat > 15:
                     yield ": heartbeat\n\n"
                     last_heartbeat = time.time()
         finally:
             sse_gate.leave(ip)
+            if queue is not None and bus is not None:
+                await bus.unsubscribe(queue)
             if pubsub is not None:
                 try:
                     await pubsub.unsubscribe(REDIS_CHANNEL)
