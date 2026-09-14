@@ -44,6 +44,10 @@ export type LiveCounts = {
   total_jobs: number;
   total_contracts: number;
   total_dids_scored: number;
+  /** DIDs carrying spam/sybil flags (audit transparency: shown, not hidden).
+   * Present in live /api/counts; derived from the reputation snapshot in
+   * static mode. */
+  flagged_dids?: number;
 };
 
 export type LiveHealth = {
@@ -238,6 +242,7 @@ export function useLiveData(): LiveDataState {
         total_jobs: k?.total_jobs ?? k?.jobs?.length ?? 0,
         total_contracts: t?.total_contracts ?? t?.contracts?.length ?? 0,
         total_dids_scored: r?.total_dids_scored ?? r?.dids?.length ?? 0,
+        flagged_dids: r?.spam?.flagged_dids ?? 0,
       });
 
       const generatedAt = Date.parse(latest?.generated_at ?? "") || 0;

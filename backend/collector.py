@@ -209,6 +209,14 @@ class CollectorLoop:
                     log.info("Seeded %s from %s", key, name)
                 except Exception as e:
                     log.warning("Could not seed %s: %s", name, e)
+        log.info(
+            "Committed-baseline hydration complete: %d DIDs, %d kibble jobs, "
+            "%d TCLK contracts restored from %s",
+            self.did_index.total_dids,
+            self.kibble_index.total_jobs,
+            self.tclk_index.total_contracts,
+            data_dir,
+        )
 
     async def _fetch_rooms(self) -> None:
         """GET /rooms?format=json — room metadata for scoring."""
@@ -309,16 +317,26 @@ class CollectorLoop:
                 if messages:
                     for msg in messages:
                         self._ingest(room, msg)
-                        await self._emit(
-                            {
-                                "type": "feed",
-                                "room": room,
-                                "seq": msg.get("seq"),
-                                "ts": msg.get("ts"),
-                                "from": msg.get("from"),
-                                "text": msg.get("text"),
-                            },
-                        )
+                        try:
+                            await self._emit(
+                                {
+                                    "type": "feed",
+                                    "room": room,
+                                    "seq": msg.get("seq"),
+                                    "ts": msg.get("ts"),
+                                    "from": msg.get("from"),
+                                    "text": msg.get("text"),
+                                },
+                            )
+                        except Exception as e:
+                            # Fan-out must never gate ingest sequencing: a
+                            # failed PUBLISH (redis mode, provider outage)
+                            # used to abort the loop before last_seq advanced,
+                            # so the same window was re-fetched and
+                            # re-ingested (counter inflation) until Redis
+                            # recovered. Memory mode cannot fail; degrade
+                            # the SSE feed instead, keep counters exact.
+                            log.debug("Emit failed (ingest continues): %s", e)
                     self.last_seq[room] = max(m.get("seq", 0) for m in messages)
                 self.technocore_ok = True
                 self.last_success = time.time()

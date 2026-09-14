@@ -259,4 +259,10 @@ export type ReputationIndex = {
   avg_score: number;
   score_buckets: Record<string, number>;
   dids: ReputationEntry[];
+  /** Spam-integrity block (API v1.1+) — flagged DIDs stay listed, their
+   * activity simply contributes zero to scores. */
+  spam?: {
+    adjusted?: boolean;
+    flagged_dids?: number;
+  };
 };

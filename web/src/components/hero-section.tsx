@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Users, MessageSquare, ArrowLeftRight, Package, Terminal, ArrowRight } from "lucide-react";
+import { Users, MessageSquare, ArrowLeftRight, Package, Terminal, ArrowRight, Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FriMark } from "@/components/logo";
+import { useTranslation } from "react-i18next";
 import type { LiveCounts } from "@/hooks/useLiveData";
 
 /* ------------------------------------------------------------------ */
@@ -96,6 +97,8 @@ export function HeroSection({
   connected: boolean;
   stale: boolean;
 }) {
+  const { t } = useTranslation();
+  const flagged = counts?.flagged_dids ?? 0;
   return (
     <section className="relative z-10 border-b border-border">
       <div className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-6 sm:py-8">
@@ -161,6 +164,16 @@ export function HeroSection({
             </span>
             {stale && (
               <span className="font-mono text-[10px] text-mid">· STALE</span>
+            )}
+            {flagged > 0 && (
+              <a
+                href="#reputation"
+                title={t("hero.flaggedHint")}
+                className="inline-flex items-center gap-1 rounded-full border border-mid/50 bg-mid/10 px-2 py-0.5 font-mono text-[10px] text-mid transition-colors hover:bg-mid/20"
+              >
+                <Flag className="size-3" />
+                {t("hero.flagged", { n: flagged })}
+              </a>
             )}
           </div>
         </div>
