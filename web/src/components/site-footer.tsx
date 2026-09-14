@@ -11,7 +11,7 @@ export function SiteFooter() {
           {/* Brand column */}
           <div className="col-span-2 sm:col-span-3 lg:col-span-2">
             <div className="flex items-center gap-2.5">
-              <FriMark />
+              <FriMark className="size-7" />
               <div className="text-left leading-tight">
                 <p className="font-mono text-sm font-bold tracking-[0.18em] text-accent">FRI</p>
                 <p className="font-mono text-[11px] tracking-wide text-muted">
@@ -72,8 +72,9 @@ export function SiteFooter() {
           <p className="font-mono text-xs text-faint">
             © {new Date().getFullYear()} FRI — {t("common.independentTool")}
           </p>
-          <p className="font-mono text-xs text-faint">
-            Built with FastAPI · React · SSE
+          <p className="font-mono text-xs tracking-wider text-faint">
+            <span className="text-good">&gt;▊</span>&nbsp;TRANSPARENT.
+            DECENTRALIZED. VERIFIABLE.
           </p>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Bookmark } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IndexPage } from "@/components/index-page";
@@ -11,6 +11,7 @@ import { IndexPageSkeleton } from "@/components/skeleton";
 import { LiveTicker } from "@/components/live-ticker";
 import { FriMark } from "@/components/logo";
 import { HeroSection } from "@/components/hero-section";
+import type { HeroSample } from "@/components/hero-section";
 import { MobileNav } from "@/components/mobile-nav";
 import { SiteFooter } from "@/components/site-footer";
 import { LanguageSelector } from "@/components/language-selector";
@@ -101,6 +102,21 @@ export function App() {
     error,
   } = useLiveData();
   const watchlist = useWatchlist();
+
+  // Hero terminal sample: top-reputation DID with its live flag state.
+  const heroSample: HeroSample | null = useMemo(() => {
+    const entry = reputation?.dids?.[0];
+    if (!entry) return null;
+    const stats = dids?.dids?.find((d) => d.did === entry.did);
+    const flags =
+      entry.components?.activity?.spam_flags ?? stats?.spam_flags ?? [];
+    return {
+      did: entry.did,
+      score: entry.reputation_score,
+      flags,
+      lastActive: stats?.last_active ?? null,
+    };
+  }, [reputation, dids]);
 
   const [view, setView] = useState<View>(
     () => viewFromHash() ?? { kind: "tab", tab: "rooms" },
@@ -301,7 +317,11 @@ export function App() {
       <div className="pb-14 lg:pb-0">
         {tab === "rooms" ? (
           <>
-            <HeroSection counts={counts} connected={connected} stale={stale} />
+            <HeroSection
+              counts={counts}
+              sample={heroSample}
+              stale={stale}
+            />
             <IndexPage feed={feed} />
           </>
         ) : tab === "dids" ? (
@@ -377,14 +397,14 @@ function NavBar({
           className="group flex items-center gap-2.5"
           aria-label="FRI — Flop Reputation Index"
         >
-          <FriMark />
+          <FriMark className="size-7" />
           <div className="text-left leading-tight">
             <p className="font-mono text-sm font-bold tracking-[0.18em] text-accent">
               FRI
             </p>
-            <h1 className="font-mono text-[11px] tracking-wide text-muted">
+            <p className="font-mono text-[11px] tracking-wide text-muted">
               flop reputation index
-            </h1>
+            </p>
           </div>
         </button>
 
@@ -443,6 +463,38 @@ function NavBar({
                 </span>
               )}
             </button>
+          </div>
+          <div
+            className="hidden items-center gap-1.5 sm:flex"
+            title={connected ? "Live" : "Disconnected"}
+          >
+            <span className="relative flex size-2">
+              <span
+                className={cn(
+                  "absolute inline-flex size-full animate-ping rounded-full opacity-75",
+                  connected ? "bg-good" : "bg-low",
+                )}
+              />
+              <span
+                className={cn(
+                  "relative inline-flex size-2 rounded-full",
+                  connected ? "bg-good" : "bg-low",
+                )}
+              />
+            </span>
+            <span
+              className={cn(
+                "font-mono text-[10px] tracking-[0.18em] uppercase",
+                connected ? "text-good" : "text-low",
+              )}
+            >
+              {connected ? t("common.live") : t("common.disconnected")}
+            </span>
+            {stale && (
+              <span className="font-mono text-[10px] text-mid">
+                · {t("common.stale")}
+              </span>
+            )}
           </div>
           <LanguageSelector compact />
         </div>

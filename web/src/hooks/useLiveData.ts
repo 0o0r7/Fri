@@ -48,6 +48,9 @@ export type LiveCounts = {
    * Present in live /api/counts; derived from the reputation snapshot in
    * static mode. */
   flagged_dids?: number;
+  /** Signed messages observed in the sampling window. Live mode normalizes
+   * it from counts.window.messages_observed; static mode from the DID index. */
+  messages_observed?: number;
 };
 
 export type LiveHealth = {
@@ -103,6 +106,16 @@ const MAX_API_REPROBES = 10;
 
 const MAX_LIVE_MESSAGES = 200;
 
+/** The live /api/counts payload nests the message count under `window`; the
+ * frontend contract flattens it so consumers never touch the nested shape. */
+function normalizeCounts(c: any): LiveCounts {
+  if (!c) return c;
+  return {
+    ...c,
+    messages_observed: c.messages_observed ?? c.window?.messages_observed,
+  };
+}
+
 export function useLiveData(): LiveDataState {
   const [feed, setFeed] = useState<Feed | null>(null);
   const [dids, setDids] = useState<DidIndex | null>(null);
@@ -143,7 +156,7 @@ export function useLiveData(): LiveDataState {
       setKibble(k);
       setTclk(t);
       setReputation(r);
-      setCounts(c);
+      setCounts(normalizeCounts(c));
       setHealth(h);
       setStale(h?.stale ?? false);
       setError(null);
@@ -167,7 +180,7 @@ export function useLiveData(): LiveDataState {
           const parsed = JSON.parse(data);
           switch (type) {
             case "counts":
-              setCounts(parsed);
+              setCounts(normalizeCounts(parsed));
               break;
             case "feed":
               setLiveMessages((prev) =>
@@ -243,6 +256,7 @@ export function useLiveData(): LiveDataState {
         total_contracts: t?.total_contracts ?? t?.contracts?.length ?? 0,
         total_dids_scored: r?.total_dids_scored ?? r?.dids?.length ?? 0,
         flagged_dids: r?.spam?.flagged_dids ?? 0,
+        messages_observed: d?.total_messages_sampled ?? 0,
       });
 
       const generatedAt = Date.parse(latest?.generated_at ?? "") || 0;

@@ -63,6 +63,15 @@ export type DidStats = {
   rooms: string[];
   rooms_breakdown: Record<string, number>;
   avg_message_length: number;
+  /** Spam-integrity fields (API v1.1+) — optional so static snapshots
+   * without them still type-check. */
+  spam_flags?: string[];
+  spam_ratio?: number;
+  low_signal_msgs?: number;
+  peak_msgs_per_min?: number;
+  phrase_msgs?: number;
+  template_msgs?: number;
+  campaign_msgs?: number;
 };
 
 export type DidIndex = {
@@ -212,6 +221,11 @@ export type ReputationComponents = {
     rooms_component: number;
     length_component: number;
     subscore: number;
+    /** Spam-integrity fields (API v1.1+) — flags ride along on the
+     * activity block; optional for older snapshots. */
+    effective_messages?: number;
+    low_signal_msgs?: number;
+    spam_flags?: string[];
   };
   work: {
     deliveries_made: number;
