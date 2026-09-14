@@ -315,6 +315,10 @@ class KibbleIndex:
         self._jobs: Dict[str, KibbleJob] = {}
         self._total_frames: int = 0
         self._total_messages_sampled: int = 0
+        # Floor for total_jobs: kibble.json lists a TOP-500-truncated view
+        # while publishing the true total — hydrate() must restore the
+        # published total instead of deriving it from the truncated list.
+        self._total_jobs_floor: int = 0
         self._frames_by_kind: Dict[str, int] = {
             "JOB": 0,
             "CLAIM": 0,
@@ -549,6 +553,9 @@ class KibbleIndex:
         self._total_messages_sampled = max(
             self._total_messages_sampled, _int(payload.get("total_messages_sampled"))
         )
+        self._total_jobs_floor = max(
+            self._total_jobs_floor, _int(payload.get("total_jobs"))
+        )
         self._total_frames = max(
             self._total_frames, _int(payload.get("total_frames"))
         )
@@ -621,7 +628,7 @@ class KibbleIndex:
     # Convenience properties
     @property
     def total_jobs(self) -> int:
-        return len(self._jobs)
+        return max(len(self._jobs), self._total_jobs_floor)
 
     @property
     def total_frames(self) -> int:

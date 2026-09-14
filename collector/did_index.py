@@ -114,6 +114,11 @@ class DidIndex:
     def __init__(self) -> None:
         self._dids: Dict[str, DidStats] = {}
         self._total_messages_sampled: int = 0
+        # Floor for total_dids: dids.json lists a TOP-500-truncated view while
+        # publishing the true total — the ecosystem outgrew the cap (892 DIDs
+        # as of 2026-09-14), so hydrate() must restore the published total
+        # instead of deriving it from the truncated list.
+        self._total_dids_floor: int = 0
 
     def ingest_message(self, room: str, message: Dict[str, Any]) -> None:
         """Update the index with one message. Only signed messages count."""
@@ -188,6 +193,13 @@ class DidIndex:
             )
         except (TypeError, ValueError):
             pass
+        try:
+            self._total_dids_floor = max(
+                self._total_dids_floor,
+                int(payload.get("total_dids") or 0),
+            )
+        except (TypeError, ValueError):
+            pass
 
         restored = 0
         for entry in payload.get("dids", []):
@@ -225,4 +237,4 @@ class DidIndex:
     # Convenience for the collector
     @property
     def total_dids(self) -> int:
-        return len(self._dids)
+        return max(len(self._dids), self._total_dids_floor)

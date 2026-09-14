@@ -272,6 +272,11 @@ class TclkIndex:
         self._offer_id_to_contract: Dict[str, str] = {}
         self._total_frames: int = 0
         self._total_messages_sampled: int = 0
+        # Floor for total_contracts: tclk.json lists a TOP-500-truncated view
+        # while publishing the true total — the ecosystem outgrew the cap
+        # (892 contracts as of 2026-09-14), so hydrate() must restore the
+        # published total instead of deriving it from the truncated list.
+        self._total_contracts_floor: int = 0
         self._frames_by_type: Dict[str, int] = {t: 0 for t in KNOWN_FRAME_TYPES}
         self._frames_by_type["unknown"] = 0
         self._parse_failures: int = 0
@@ -720,12 +725,15 @@ class TclkIndex:
             oid = (contract.offer or {}).get("id")
             if oid and oid != cid:
                 self._offer_id_to_contract[oid] = cid
+        self._total_contracts_floor = max(
+            self._total_contracts_floor, _int(payload.get("total_contracts"))
+        )
         return restored
 
     # Convenience properties
     @property
     def total_contracts(self) -> int:
-        return len(self._contracts)
+        return max(len(self._contracts), self._total_contracts_floor)
 
     @property
     def total_frames(self) -> int:

@@ -435,7 +435,11 @@ class TestRealDataHydration:
         fresh = DidIndex()
         restored = fresh.hydrate(payload)
         assert restored == len(payload["dids"]) > 0
-        assert fresh.total_dids == len(payload["dids"])
+        # dids.json publishes the TRUE total next to a top-500-truncated
+        # list — hydrate() must floor the counter at the published total,
+        # not derive it from the truncated list.
+        assert fresh.total_dids == payload["total_dids"]
+        assert fresh.total_dids >= len(payload["dids"])
         for entry in payload["dids"][:5]:
             assert fresh.get(entry["did"]).to_dict() == entry
 
@@ -473,3 +477,54 @@ class TestRealDataHydration:
                     for e in payload["contracts"]
                 )
                 assert c.offer_linked_elsewhere == linked, oid
+
+
+class TestTruncatedTotalRestore:
+    """Batch snapshots truncate the entity list to top-500 while publishing
+    the TRUE total. Once the ecosystem outgrew the cap (2026-09-14:
+    tclk total_contracts 892, dids 2510) the real-data canary caught
+    hydrate() deriving counters from the truncated list — boot reported
+    500 contracts/500 DIDs instead of the published totals. The fix floors
+    each counter at the published total (same max() pattern already used
+    for total_messages_sampled)."""
+
+    def test_tclk_total_survives_truncated_list(self):
+        payload = json.loads((DATA_DIR / "tclk.json").read_text())
+        true_total = payload["total_contracts"]
+        payload["contracts"] = payload["contracts"][:2]
+        fresh = TclkIndex()
+        fresh.hydrate(payload)
+        assert fresh.total_contracts == true_total
+
+    def test_dids_total_survives_truncated_list(self):
+        payload = json.loads((DATA_DIR / "dids.json").read_text())
+        true_total = payload["total_dids"]
+        payload["dids"] = payload["dids"][:2]
+        fresh = DidIndex()
+        fresh.hydrate(payload)
+        assert fresh.total_dids == true_total
+
+    def test_kibble_total_survives_truncated_list(self):
+        payload = json.loads((DATA_DIR / "kibble.json").read_text())
+        true_total = payload["total_jobs"]
+        payload["jobs"] = payload["jobs"][:2]
+        fresh = KibbleIndex()
+        fresh.hydrate(payload)
+        assert fresh.total_jobs == true_total
+
+    def test_floor_applies_even_with_empty_list(self):
+        idx = TclkIndex()
+        idx.hydrate({"contracts": [], "total_contracts": 3})
+        assert idx.total_contracts == 3
+
+    def test_floor_never_shrinks_below_live_ingest(self):
+        payload = json.loads((DATA_DIR / "tclk.json").read_text())
+        payload["contracts"] = []
+        payload["total_contracts"] = 3
+        fresh = TclkIndex()
+        fresh.hydrate(payload)
+        fresh.ingest_message(
+            "tclk",
+            {"text": 'tclk1:offer {"id":"c9","amount":1}', "ts": "2026-09-14T00:00:00Z", "seq": 1},
+        )
+        assert fresh.total_contracts >= 3  # live ingest counts on top
