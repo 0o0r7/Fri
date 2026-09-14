@@ -73,7 +73,14 @@ class TestDidHydrate:
         assert a.first_seen == "2026-09-12T10:00:00Z"
         assert a.last_active == "2026-09-12T11:00:00Z"
         assert a.total_text_chars == 200  # avg round-trips exactly
-        assert a.to_dict() == idx.get(PAYER).to_dict()
+        # peak_msgs_per_min is deliberately NOT serialized (the 10-minute
+        # rate window is relative to boot time and meaningless post-restart);
+        # every other published field must round-trip exactly.
+        live = dict(idx.get(PAYER).to_dict())
+        live.pop("peak_msgs_per_min")
+        hyd = dict(a.to_dict())
+        hyd.pop("peak_msgs_per_min")
+        assert hyd == live
 
     def test_hydrate_is_idempotent_and_live_ingest_wins(self):
         idx = DidIndex()
@@ -441,7 +448,16 @@ class TestRealDataHydration:
         assert fresh.total_dids == payload["total_dids"]
         assert fresh.total_dids >= len(payload["dids"])
         for entry in payload["dids"][:5]:
-            assert fresh.get(entry["did"]).to_dict() == entry
+            hyd = fresh.get(entry["did"]).to_dict()
+            # Legacy projection: every v1.0 field round-trips exactly. The
+            # v1.1 spam-integrity additions (phrase/template/campaign_msgs,
+            # low_signal_msgs, spam_ratio, peak_msgs_per_min, spam_flags)
+            # hydrate as zeros for pre-v1.1 baselines.
+            assert {k: hyd[k] for k in entry} == entry
+            assert hyd["phrase_msgs"] == 0
+            assert hyd["template_msgs"] == 0
+            assert hyd["campaign_msgs"] == 0
+            assert hyd["spam_flags"] == []
 
     def test_real_kibble_roundtrip(self):
         payload = json.loads((DATA_DIR / "kibble.json").read_text())

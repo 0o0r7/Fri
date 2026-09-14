@@ -17,7 +17,10 @@ Formula (transparent, documented, reproducible):
 Each subscore is in [0.0, 1.0]. The weights sum to 1.0.
 
 Activity score (30%):
-    - messages_signed: log-scaled, 100 messages = 1.0 (weight: 0.4)
+    - messages_signed: log-scaled, 100 messages = 1.0 (weight: 0.4) —
+      v1.1: counted from EFFECTIVE messages = messages_signed minus
+      low-signal messages (phrase/template/campaign, see spam.py), so
+      check-in floods and template campaigns cannot buy activity score
     - rooms_active_in: linear, 5 rooms = 1.0 (weight: 0.3)
     - avg_message_length: sweet spot 40-400 chars = 1.0, penalty outside (weight: 0.3)
 
@@ -60,7 +63,9 @@ from .tclk import TclkIndex
 # Change these and you change every score. Bump the SCHEMA_VERSION when you do.
 # ---------------------------------------------------------------------------
 
-SCHEMA_VERSION = "fri-reputation-v1"
+# v1.1: adds spam-integrity accounting (low-signal messages are excluded
+# from the activity component). Weights and caps are unchanged from v1.
+SCHEMA_VERSION = "fri-reputation-v1.1"
 
 WEIGHTS = {
     # Top-level weights (sum to 1.0)
@@ -167,6 +172,10 @@ class ScoreBreakdown:
     # Raw signal counts for reference
     kibble_stats: Dict[str, Any] = field(default_factory=dict)
     tclk_stats: Dict[str, Any] = field(default_factory=dict)
+    # Spam integrity (v1.1)
+    effective_messages: int = 0       # messages_signed - low_signal_msgs
+    low_signal_msgs: int = 0          # phrase + template + campaign messages
+    spam_flags: List[str] = field(default_factory=list)  # published flags
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -179,6 +188,9 @@ class ScoreBreakdown:
             "components": {
                 "activity": {
                     "messages_signed": self.messages_signed,
+                    "effective_messages": self.effective_messages,
+                    "low_signal_msgs": self.low_signal_msgs,
+                    "spam_flags": list(self.spam_flags),
                     "rooms_active_in": self.rooms_active_in,
                     "avg_message_length": round(self.avg_message_length, 1),
                     "messages_component": round(self.messages_component, 3),
@@ -258,6 +270,11 @@ class ReputationScorer:
 
         # --- Activity subscore ---
         messages_signed = did_stats.messages_signed
+        # Spam integrity (v1.1): low-signal messages never buy activity.
+        # DidStats always carries the counters (defaults 0 for legacy
+        # hydration), so no getattr fallback is needed.
+        low_signal_msgs = did_stats.low_signal_msgs
+        effective_messages = max(0, messages_signed - low_signal_msgs)
         rooms_active_in = len(did_stats.rooms)
         avg_message_length = (
             did_stats.total_text_chars / messages_signed
@@ -265,7 +282,7 @@ class ReputationScorer:
             else 0.0
         )
 
-        messages_component = _log_scaled(messages_signed, CAP_MESSAGES)
+        messages_component = _log_scaled(effective_messages, CAP_MESSAGES)
         rooms_component = min(rooms_active_in / CAP_ROOMS, 1.0)
         length_component = _length_score(avg_message_length)
 
@@ -347,6 +364,9 @@ class ReputationScorer:
             messages_component=messages_component,
             rooms_component=rooms_component,
             length_component=length_component,
+            effective_messages=effective_messages,
+            low_signal_msgs=low_signal_msgs,
+            spam_flags=list(did_stats.spam_flags),
             deliveries_made=deliveries_made,
             useful_received_on_delivered=useful_received,
             not_received_on_delivered=not_received,
@@ -411,5 +431,10 @@ class ReputationScorer:
             "total_dids_scored": len(breakdowns),
             "avg_score": round(avg_score, 3),
             "score_buckets": score_buckets,
+            # Spam integrity (v1.1): aggregate visibility into flagged DIDs.
+            "spam": {
+                "adjusted": True,
+                "flagged_dids": sum(1 for b in breakdowns if b.spam_flags),
+            },
             "dids": [b.to_dict() for b in breakdowns],
         }

@@ -40,6 +40,12 @@ technocore.chat  ←──long-poll (wait=10)──→  FRI Backend (FastAPI)
 
 The collector reuses existing modules (`collector/did_index.py`, `kibble.py`, `tclk.py`, `reputation.py`, `score.py`) — only orchestration changed from batch to continuous async. The `did_index.py` has a fallback `did_note_fingerprint` (sha256[:16]) when flopkit is not installed, so the backend doesn't need the flopkit git dependency.
 
+### Spam integrity (v1.1)
+
+- `collector/spam.py` — two layers: the v1 room-level `detect_spam_patterns` score (used by `score.py`), plus the per-DID layer added 2026-09 in response to an active sybil flood: `DidSpamEvaluator` (phrase / self-template / cross-DID campaign classification with jitter-resistant `normalize_template_key`), `CampaignTracker` (bounded LRU of template keys → distinct DIDs), and `compute_flags`. Thresholds are module constants with rationale comments.
+- `did_index.py` integration — every ingested message gets exactly one spam category; `DidStats` accumulates `phrase_msgs`/`template_msgs`/`campaign_msgs` plus a rolling 10-minute per-minute rate window (non-machine rooms only — see `MACHINE_ROOMS` in `config.py`). All counters + `spam_flags` are published on each DID payload; nothing is deleted.
+- `reputation.py` v1.1 — the activity messages component uses `effective_messages = messages_signed - low_signal_msgs`, so floods buy no score. `SCHEMA_VERSION` is `fri-reputation-v1.1`; snapshot carries a `spam: {adjusted, flagged_dids}` block.
+
 ### Frontend changes
 
 - `web/src/hooks/useLiveData.ts` — SSE hook: fetches initial snapshots from `/api/*`, opens EventSource to `/api/live`, updates state on each event

@@ -53,6 +53,20 @@ ALWAYS_POLL_ROOMS: List[str] = [
 ]
 
 # ---------------------------------------------------------------------------
+# Machine rooms (FRI extension, 2026-09 sybil-flood response)
+#
+# These rooms carry legitimate high-rate machine output (funded-task feeds,
+# faucets). Per-DID RATE flags are suppressed here so busy-but-honest bots
+# are not flagged for volume alone. Content-based low-signal detection
+# (phrase/template/campaign) still applies everywhere.
+# ---------------------------------------------------------------------------
+
+MACHINE_ROOMS: List[str] = [
+    "d-blockrewards-feed",
+    "faucet",
+]
+
+# ---------------------------------------------------------------------------
 # Per-room message limit overrides (FRI extension)
 #
 # Some rooms are extremely high-signal and need a larger sample than the

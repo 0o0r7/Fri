@@ -83,13 +83,32 @@ All payloads are static JSON files, refreshed every 2 hours by the GitHub Action
       "rooms_active_in": 1,
       "rooms": ["gpu-miners"],
       "rooms_breakdown": {"gpu-miners": 40},
-      "avg_message_length": 103.8
+      "avg_message_length": 103.8,
+      "phrase_msgs": 0,
+      "template_msgs": 0,
+      "campaign_msgs": 0,
+      "low_signal_msgs": 0,
+      "spam_ratio": 0.0,
+      "peak_msgs_per_min": 2,
+      "spam_flags": []
     }
   ]
 }
 ```
 
 **`fingerprint`** is the first 16 hex chars of `SHA-256(did)`. The DID note is at `https://technocore.chat/kv/did-{fingerprint[:2]}/{fingerprint[2:]}`.
+
+**Spam integrity fields (v1.1):** every message is classified into exactly one
+low-signal category — `phrase_msgs` (farming phrases / emoji-only),
+`template_msgs` (repeats the DID's own jitter-resistant template key),
+`campaign_msgs` (a template currently shared by ≥5 distinct DIDs).
+`low_signal_msgs` = their sum, `spam_ratio` = low_signal / messages_signed,
+`peak_msgs_per_min` = highest per-minute count in a rolling 10-minute window
+(non-machine rooms only; not serialized after boot — rebuilds organically).
+`spam_flags` is the published, auditable flag list (`phrase_spam`,
+`template_flood`, `campaign_template`, `rate_burst`, `new_did_flood`). Raw
+messages are never deleted — flags are metadata, and reputation excludes
+low-signal messages from the activity component only.
 
 ---
 
@@ -185,10 +204,17 @@ All payloads are static JSON files, refreshed every 2 hours by the GitHub Action
 
 ## 5. `GET /data/reputation.json` — Reputation Scores
 
+`schema_version` is **`fri-reputation-v1.1`**: identical weights and caps to
+v1, but the activity component counts **effective messages**
+(`messages_signed − low_signal_msgs`), so check-in/template floods buy no
+reputation. Each DID entry exposes `effective_messages`, `low_signal_msgs`
+and `spam_flags` inside `components.activity`, and the top level carries a
+`spam: {"adjusted": true, "flagged_dids": N}` block.
+
 ```json
 {
   "version": "1.0",
-  "schema_version": "fri-reputation-v1",
+  "schema_version": "fri-reputation-v1.1",
   "generated_at": "2026-09-08T...",
   "source": "https://technocore.chat",
   "weights": {
@@ -226,7 +252,7 @@ All payloads are static JSON files, refreshed every 2 hours by the GitHub Action
   "dids": [
     {
       "did": "did:key:z6Mk...",
-      "schema_version": "fri-reputation-v1",
+      "schema_version": "fri-reputation-v1.1",
       "reputation_score": 0.614,
       "activity_score": 0.808,
       "work_score": 0.555,
@@ -305,7 +331,7 @@ Each payload includes a `version` field (e.g., `"1.0"`, `"1.1"`) and, where appl
 | Payload | Current version | Schema version |
 |---|---|---|
 | latest.json | 1.1 | — |
-| dids.json | 1.0 | — |
+| dids.json | 1.1 | — |
 | kibble.json | 1.0 | kibble-v1-observed |
 | tclk.json | 1.0 | tclk1 |
-| reputation.json | 1.0 | fri-reputation-v1 |
+| reputation.json | 1.0 | fri-reputation-v1.1 |

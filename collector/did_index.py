@@ -40,6 +40,17 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from .config import MACHINE_ROOMS
+from .spam import (
+    CATEGORY_CLEAN,
+    CATEGORY_CAMPAIGN,
+    CATEGORY_PHRASE,
+    CATEGORY_TEMPLATE,
+    DidSpamEvaluator,
+    RATE_WINDOW_MIN,
+    compute_flags,
+)
+
 try:
     from flopkit.technocore import did_note_fingerprint
 except ImportError:
@@ -56,9 +67,25 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 
+def _ts_minute(ts: str) -> Optional[int]:
+    """Epoch-minute of an ISO timestamp; None when unparseable."""
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        return int(dt.timestamp() // 60)
+    except (ValueError, TypeError, OSError):
+        return None
+
+
 @dataclass
 class DidStats:
-    """Accumulator for one DID's activity across all sampled rooms."""
+    """Accumulator for one DID's activity across all sampled rooms.
+
+    Low-signal (spam) accounting: every message carries exactly one spam
+    category (clean/phrase/template/campaign — see spam.py), so the three
+    counters below sum to the total low-signal count without double
+    subtraction. Rate buckets hold per-minute message counts from
+    non-machine rooms only, pruned to a rolling 10-minute window.
+    """
 
     did: str
     first_seen: Optional[str] = None
@@ -66,11 +93,36 @@ class DidStats:
     messages_signed: int = 0
     rooms: Dict[str, int] = field(default_factory=dict)  # room_name -> msg count
     total_text_chars: int = 0  # for avg_message_length
+    # Low-signal counters (serialized; hydrated from dids.json when present)
+    phrase_msgs: int = 0      # farming phrases / emoji-only / no-signal text
+    template_msgs: int = 0    # repeats this DID's own earlier template
+    campaign_msgs: int = 0    # template currently shared by many DIDs
+    # Rate window (not serialized — rebuilt organically after boot)
+    _rate_buckets: Dict[int, int] = field(
+        default_factory=dict, repr=False, compare=False
+    )  # minute_epoch -> count
 
-    def ingest(self, room: str, ts: str, text: str) -> None:
+    def ingest(
+        self, room: str, ts: str, text: str, spam_category: str = CATEGORY_CLEAN
+    ) -> None:
         self.messages_signed += 1
         self.rooms[room] = self.rooms.get(room, 0) + 1
         self.total_text_chars += len(text or "")
+
+        if spam_category == CATEGORY_PHRASE:
+            self.phrase_msgs += 1
+        elif spam_category == CATEGORY_TEMPLATE:
+            self.template_msgs += 1
+        elif spam_category == CATEGORY_CAMPAIGN:
+            self.campaign_msgs += 1
+
+        # Rate tracking: non-machine rooms only (busy-but-honest machine
+        # feeds must not trip volume flags; content flags still apply).
+        if room not in MACHINE_ROOMS and ts:
+            minute = _ts_minute(ts)
+            if minute is not None:
+                self._rate_buckets[minute] = self._rate_buckets.get(minute, 0) + 1
+                self._prune_rate_buckets()
 
         if ts:
             if self.first_seen is None or ts < self.first_seen:
@@ -78,12 +130,46 @@ class DidStats:
             if self.last_active is None or ts > self.last_active:
                 self.last_active = ts
 
+    def _prune_rate_buckets(self) -> None:
+        """Keep only the most recent RATE_WINDOW_MIN minutes of buckets."""
+        if not self._rate_buckets:
+            return
+        newest = max(self._rate_buckets)
+        cutoff = newest - RATE_WINDOW_MIN + 1
+        self._rate_buckets = {
+            m: c for m, c in self._rate_buckets.items() if m >= cutoff
+        }
+
+    @property
+    def low_signal_msgs(self) -> int:
+        """Messages that carry no usable participation signal."""
+        return self.phrase_msgs + self.template_msgs + self.campaign_msgs
+
+    @property
+    def peak_msgs_per_min(self) -> int:
+        """Highest per-minute message count in the rolling rate window."""
+        return max(self._rate_buckets.values(), default=0)
+
+    @property
+    def spam_flags(self) -> List[str]:
+        """Published, auditable flags derived from the counters."""
+        return compute_flags(
+            messages_signed=self.messages_signed,
+            phrase_msgs=self.phrase_msgs,
+            template_msgs=self.template_msgs,
+            campaign_msgs=self.campaign_msgs,
+            peak_msgs_per_min=self.peak_msgs_per_min,
+            first_seen=self.first_seen,
+            last_active=self.last_active,
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         avg_len = (
             self.total_text_chars / self.messages_signed
             if self.messages_signed > 0
             else 0.0
         )
+        low_signal = self.low_signal_msgs
         return {
             "did": self.did,
             "fingerprint": did_note_fingerprint(self.did),
@@ -96,6 +182,16 @@ class DidStats:
                 sorted(self.rooms.items(), key=lambda kv: -kv[1])
             ),
             "avg_message_length": round(avg_len, 1),
+            # Spam integrity (v1.1) — published, never silently removed
+            "phrase_msgs": self.phrase_msgs,
+            "template_msgs": self.template_msgs,
+            "campaign_msgs": self.campaign_msgs,
+            "low_signal_msgs": low_signal,
+            "spam_ratio": round(low_signal / self.messages_signed, 3)
+            if self.messages_signed > 0
+            else 0.0,
+            "peak_msgs_per_min": self.peak_msgs_per_min,
+            "spam_flags": self.spam_flags,
         }
 
 
@@ -114,6 +210,10 @@ class DidIndex:
     def __init__(self) -> None:
         self._dids: Dict[str, DidStats] = {}
         self._total_messages_sampled: int = 0
+        # Per-message low-signal classifier (template/campaign/phrase).
+        # Owned by the index so both the live collector and the batch
+        # pipeline share identical spam semantics.
+        self._spam = DidSpamEvaluator()
         # Floor for total_dids: dids.json lists a TOP-500-truncated view while
         # publishing the true total — the ecosystem outgrew the cap (892 DIDs
         # as of 2026-09-14), so hydrate() must restore the published total
@@ -128,11 +228,12 @@ class DidIndex:
             return
         ts = message.get("ts") or ""
         text = message.get("text") or ""
+        verdict = self._spam.observe(room=room, did=frm, text=text)
         stats = self._dids.get(frm)
         if stats is None:
             stats = DidStats(did=frm)
             self._dids[frm] = stats
-        stats.ingest(room=room, ts=ts, text=text)
+        stats.ingest(room=room, ts=ts, text=text, spam_category=verdict.category)
 
     def ingest_messages(self, room: str, messages: List[Dict[str, Any]]) -> None:
         for m in messages:
@@ -201,6 +302,12 @@ class DidIndex:
         except (TypeError, ValueError):
             pass
 
+        def _clamp_count(value: Any) -> int:
+            try:
+                return max(0, int(value or 0))
+            except (TypeError, ValueError):
+                return 0
+
         restored = 0
         for entry in payload.get("dids", []):
             if not isinstance(entry, dict):
@@ -230,6 +337,12 @@ class DidIndex:
                 messages_signed=messages,
                 rooms=rooms,
                 total_text_chars=int(round(avg_len * messages)),
+                # Spam counters round-trip when present; legacy baselines
+                # (pre-v1.1 files) hydrate with zeros — rate buckets and
+                # flags rebuild organically from live traffic.
+                phrase_msgs=_clamp_count(entry.get("phrase_msgs")),
+                template_msgs=_clamp_count(entry.get("template_msgs")),
+                campaign_msgs=_clamp_count(entry.get("campaign_msgs")),
             )
             restored += 1
         return restored

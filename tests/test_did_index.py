@@ -180,3 +180,115 @@ def test_didindex_ingest_messages_bulk():
     snap = idx.snapshot()
     assert snap["total_messages_sampled"] == 5
     assert snap["dids"][0]["messages_signed"] == 5
+
+
+# ---------------------------------------------------------------------------
+# Spam integrity (v1.1) — per-DID low-signal tracking
+# ---------------------------------------------------------------------------
+
+from collector.spam import CATEGORY_CLEAN, CATEGORY_PHRASE  # noqa: E402
+
+FLOOD_TEMPLATE = "Another day, another check-in. The decentralized AI vision is compelling."
+
+
+def test_ingest_message_classifies_low_signal_categories():
+    idx = DidIndex()
+    did = "did:key:z6MkSpam"
+    idx.ingest_message("lobby", _msg(1, did, FLOOD_TEMPLATE + " · aa1"))
+    idx.ingest_message("lobby", _msg(2, did, FLOOD_TEMPLATE + " · bb2"))
+    out = idx.get(did).to_dict()
+    # Message 1 hits the "check-in" phrase rule; message 2 repeats the DID's
+    # own template (stronger signal, checked before phrase). Categories are
+    # exclusive, so counters never double-subtract.
+    assert out["phrase_msgs"] == 1
+    assert out["template_msgs"] == 1
+    assert out["low_signal_msgs"] == 2
+    assert out["spam_ratio"] == 1.0
+
+
+def test_didstats_rate_buckets_peak_and_prune():
+    s = DidStats(did="did:key:z6Mktest")
+    # 12 messages inside one minute, non-machine room → peak = 12.
+    for i in range(12):
+        s.ingest("lobby", f"2026-09-14T07:10:{i:02d}Z", f"distinct observation {i} about protocol {i}")
+    assert s.peak_msgs_per_min == 12
+    # Buckets prune to the rolling window (only one minute present here).
+    assert len(s._rate_buckets) == 1
+    assert "rate_burst" in s.spam_flags
+
+
+def test_machine_room_rate_exempt():
+    s = DidStats(did="did:key:z6MkMachine")
+    for i in range(30):
+        s.ingest("d-blockrewards-feed", f"2026-09-14T07:10:{i:02d}Z" if i < 60 else "", f"task {i} dispatch ok")
+    assert s.peak_msgs_per_min == 0
+    assert "rate_burst" not in s.spam_flags
+
+
+def test_rate_buckets_prune_to_window():
+    s = DidStats(did="did:key:z6Mktest")
+    # One message per minute across 25 minutes → buckets keep last 10.
+    for m in range(25):
+        s.ingest("lobby", f"2026-09-14T07:{m:02d}:00Z", f"steady chatter minute {m} no repeats here")
+    assert len(s._rate_buckets) <= 10
+    assert s.peak_msgs_per_min == 1
+    assert "rate_burst" not in s.spam_flags
+
+
+def test_to_dict_publishes_spam_fields():
+    idx = DidIndex()
+    did = "did:key:z6MkClean"
+    for i in range(3):
+        idx.ingest_message("technocore", _msg(i, did, f"Distinct point {chr(97+i)}: signature batching differs from note batching."))
+    out = idx.get(did).to_dict()
+    for key in ("phrase_msgs", "template_msgs", "campaign_msgs", "low_signal_msgs",
+                "spam_ratio", "peak_msgs_per_min", "spam_flags"):
+        assert key in out
+    assert out["spam_ratio"] == 0.0
+    assert out["spam_flags"] == []
+
+
+def test_hydrate_legacy_payload_without_spam_fields():
+    idx = DidIndex()
+    payload = {
+        "total_dids": 1,
+        "total_messages_sampled": 2,
+        "dids": [{
+            "did": "did:key:z6MkLegacy",
+            "first_seen": "2026-09-07T17:48:13Z",
+            "last_active": "2026-09-08T19:20:00Z",
+            "messages_signed": 7,
+            "rooms_breakdown": {"lobby": 7},
+            "avg_message_length": 42.0,
+        }],
+    }
+    restored = idx.hydrate(payload)
+    assert restored == 1
+    entry = idx.get("did:key:z6MkLegacy").to_dict()
+    assert entry["phrase_msgs"] == 0
+    assert entry["template_msgs"] == 0
+    assert entry["campaign_msgs"] == 0
+    assert entry["spam_flags"] == []
+
+
+def test_hydrate_roundtrips_spam_counters():
+    idx = DidIndex()
+    did = "did:key:z6MkSpam"
+    for i in range(30):
+        idx.ingest_message("lobby", _msg(i, did, FLOOD_TEMPLATE + f" · t{i}"))
+    payload = idx.snapshot()
+    idx2 = DidIndex()
+    idx2.hydrate(payload)
+    a = idx.get(did).to_dict()
+    b = idx2.get(did).to_dict()
+    for key in ("phrase_msgs", "template_msgs", "campaign_msgs", "low_signal_msgs", "spam_ratio"):
+        assert a[key] == b[key], key
+
+
+def test_snapshot_total_counts_unchanged_by_spam():
+    # Low-signal messages still count toward messages_sampled / unique DIDs —
+    # nothing is deleted; only the reputation activity component excludes them.
+    idx = DidIndex()
+    idx.ingest_message("lobby", _msg(1, "did:key:z6MkSpam", FLOOD_TEMPLATE))
+    assert idx.total_dids == 1
+    assert idx.snapshot()["total_messages_sampled"] == 1

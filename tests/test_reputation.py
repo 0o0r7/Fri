@@ -83,13 +83,27 @@ def test_scorer_returns_none_for_unknown_did():
 
 
 def test_scorer_did_with_only_activity_no_kibble_no_tclk():
-    """A DID that has signed messages but no kibble or TCLK activity."""
+    """A DID that has signed messages but no kibble or TCLK activity.
+
+    v1.1: the fixture must look like organic participation — 100 DISTINCT
+    messages spread over hours. 100 identical template posts would now be
+    classified as low-signal (see spam tests) and buy no activity.
+    """
     did_idx, kibble_idx, tclk_idx = _build_indices()
-    # Sign 100 messages in 1 room, avg length ~100 chars
+    subjects = ["receipt frames", "refund paths", "attest windows", "sybil resistance",
+                "fingerprinting", "note writes", "deal expiry", "fee markets",
+                "gossip forks", "epoch length"]
+    stances = ["I would argue", "My measurements suggest", "Counterpoint:", "An alternative reading:",
+               "The data hints", "One concrete worry:", "Honestly,", "From the spec view,",
+               "A cleaner framing:", "What if instead"]
     for i in range(100):
+        # Unique opener per message (two-letter code, 676 combos) so the
+        # varying content lands INSIDE the 64-char template-key window —
+        # mirroring how organic agents vary their openings.
+        code = chr(97 + i % 26) + chr(97 + (i // 26) % 26)
         did_idx.ingest_message("lobby", {
-            "seq": i, "from": DID_A, "ts": f"2026-09-07T17:48:{i:02d}Z",
-            "text": "x" * 100,
+            "seq": i, "from": DID_A, "ts": f"2026-09-07T{17 + (i // 60):02d}:{i % 60:02d}:00Z",
+            "text": f"Point {code}: {stances[i % 10]} that {subjects[(i * 3) % 10]} behave differently under sustained load than the draft assumes.",
         })
 
     scorer = ReputationScorer(did_idx, kibble_idx, tclk_idx)
@@ -97,6 +111,7 @@ def test_scorer_did_with_only_activity_no_kibble_no_tclk():
 
     assert breakdown is not None
     assert breakdown.messages_signed == 100
+    assert breakdown.effective_messages == 100  # nothing classified low-signal
     assert breakdown.rooms_active_in == 1
     assert breakdown.activity_score > 0.5  # high activity
     assert breakdown.work_score == 0.0  # no kibble work
@@ -373,3 +388,79 @@ def test_scorer_top_limit_caps_output():
 def _tclk_frame(payload: dict) -> str:
     import json
     return "tclk1 " + json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+# ---------------------------------------------------------------------------
+# Spam integrity (v1.1) — low-signal messages never buy activity
+# ---------------------------------------------------------------------------
+
+from collector.spam import CATEGORY_PHRASE, CATEGORY_TEMPLATE  # noqa: E402
+
+FLOOD_TEMPLATE = "Another day, another check-in. The decentralized AI vision is compelling."
+DID_BOT = "did:key:z6MkFloodBot"
+DID_ORGANIC = "did:key:z6MkOrganic"
+
+
+def _flood_index(bot_msgs: int = 600):
+    """Index with one flood bot (check-in template spam) and one organic DID."""
+    idx = DidIndex()
+    for i in range(bot_msgs):
+        idx.ingest_message("lobby", {
+            "seq": i,
+            "from": DID_BOT,
+            "ts": f"2026-09-14T07:{10 + (i // 60) % 50:02d}:{i % 60:02d}Z",
+            "text": FLOOD_TEMPLATE + f" · bot{(i * 7) % 97}x",
+        })
+    for i in range(100):
+        idx.ingest_message("technocore", {
+            "seq": 1000 + i,
+            "from": DID_ORGANIC,
+            "ts": f"2026-09-14T0{6}:­{i:02d}:00Z".replace("­", ""),
+            "text": f"Point {chr(97 + i % 26)}{i}: {['receipt','refund','attest','sybil'][i % 4]} handling needs a benchmark before the next spec revision lands.",
+        })
+    return idx
+
+
+def test_flood_bot_activity_collapses():
+    idx = _flood_index()
+    bot = idx.get(DID_BOT)
+    assert bot.low_signal_msgs == bot.messages_signed
+    breakdown = ReputationScorer(idx, KibbleIndex(), TclkIndex()).score_did(DID_BOT)
+    assert breakdown.effective_messages == 0
+    assert breakdown.messages_component == 0.0
+
+
+def test_organic_outranks_flood_bot():
+    # Before v1.1 the bot's 600 messages maxed the activity component and
+    # outranked a 100-message organic participant. The ordering must flip.
+    scorer = ReputationScorer(_flood_index(), KibbleIndex(), TclkIndex())
+    assert scorer.score_did(DID_ORGANIC).reputation_score > scorer.score_did(DID_BOT).reputation_score
+
+
+def test_breakdown_publishes_spam_fields():
+    scorer = ReputationScorer(_flood_index(), KibbleIndex(), TclkIndex())
+    payload = scorer.score_did(DID_BOT).to_dict()
+    activity = payload["components"]["activity"]
+    assert activity["messages_signed"] == 600
+    assert activity["effective_messages"] == 0
+    assert activity["low_signal_msgs"] == 600
+    assert "template_flood" in activity["spam_flags"] or "phrase_spam" in activity["spam_flags"]
+
+
+def test_snapshot_spam_block():
+    payload = ReputationScorer(_flood_index(), KibbleIndex(), TclkIndex()).snapshot()
+    assert payload["schema_version"] == "fri-reputation-v1.1"
+    assert payload["spam"]["adjusted"] is True
+    assert payload["spam"]["flagged_dids"] >= 1
+
+
+def test_effective_messages_floor_at_zero():
+    # A DID whose counters were hydrated with more low-signal than total
+    # (corrupt/legacy data) must not produce negative effective messages.
+    idx = DidIndex()
+    idx.hydrate({"total_dids": 1, "dids": [{
+        "did": DID_BOT, "messages_signed": 5, "rooms_breakdown": {"lobby": 5},
+        "phrase_msgs": 99, "template_msgs": 0, "campaign_msgs": 0,
+    }]})
+    breakdown = ReputationScorer(idx, KibbleIndex(), TclkIndex()).score_did(DID_BOT)
+    assert breakdown.effective_messages == 0
