@@ -12,8 +12,9 @@ technocore.chat  ←──long-poll (wait=10)──→  FRI Backend (FastAPI)
                                             │   ├── long-poll 11 rooms
                                             │   ├── /rooms fetch every 60s
                                             │   ├── snapshot indices every 30s
-                                            │   └── publish events to Redis pub/sub
-                                            ├── Redis (cache + pub/sub)
+                                            │   └── fan events out via in-process EventBus
+                                            │       (FRI_EVENT_BUS=redis → legacy pub/sub)
+                                            ├── Redis (cache; pub/sub optional)
                                             └── SSE endpoint (/api/live)
                                                     ↓
                                             React frontend (EventSource)
@@ -28,13 +29,14 @@ technocore.chat  ←──long-poll (wait=10)──→  FRI Backend (FastAPI)
 |---|---|---|---|
 | `web` | node:22 | 3000→5173 | Vite + React frontend, proxies /api to backend |
 | `backend` | python:3.12-slim | 8000 (internal) | FastAPI + async collector loop |
-| `redis` | redis:7-alpine | 6379 (internal) | Cache JSON snapshots + pub/sub fan-out |
+| `redis` | redis:7-alpine | 6379 (internal) | Cache JSON snapshots (+ pub/sub fan-out only with `FRI_EVENT_BUS=redis`) |
 
 ### Backend (`backend/`)
 
 - `app.py` — FastAPI app: REST endpoints (`/api/*` return cached snapshots from Redis; per-DID drill-down at `/api/did/{did}/score` and `/api/did/{did}/profile`) + SSE (`/api/live` multiplexed event stream)
-- `collector.py` — async collector loop: long-polls rooms with `wait=10`, feeds messages to existing scoring modules, snapshots to Redis, publishes events. At boot it seeds Redis AND hydrates the in-memory indices from the committed `data/*.json` batch baseline, so counts/health/reputation start from full history instead of empty
-- `store.py` — Redis wrapper for JSON caching + pub/sub
+- `collector.py` — async collector loop: long-polls rooms with `wait=10`, feeds messages to existing scoring modules, snapshots to Redis, fans events out via `_emit()`. At boot it seeds Redis AND hydrates the in-memory indices from the committed `data/*.json` batch baseline, so counts/health/reputation start from full history instead of empty
+- `eventbus.py` — in-process fan-out bus (`FRI_EVENT_BUS=memory`, default): SSE events are delivered with zero Redis pub/sub commands — per-message PUBLISH used to be the largest Redis-command consumer on metered providers (Upstash 500K/mo cap exhausted in <1 month), and a failed publish also aborted poll `last_seq` updates (re-ingest risk). Bounded per-subscriber queues, drop-oldest, per-subscriber event copies
+- `store.py` — Redis wrapper for JSON caching (+ pub/sub used only in `FRI_EVENT_BUS=redis` mode)
 
 The collector reuses existing modules (`collector/did_index.py`, `kibble.py`, `tclk.py`, `reputation.py`, `score.py`) — only orchestration changed from batch to continuous async. The `did_index.py` has a fallback `did_note_fingerprint` (sha256[:16]) when flopkit is not installed, so the backend doesn't need the flopkit git dependency.
 

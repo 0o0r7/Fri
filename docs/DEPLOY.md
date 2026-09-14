@@ -19,29 +19,51 @@ This guide covers deploying FRI to production using free-tier services. The arch
 │  Render (Backend — free)  │   │  Committed JSON in repo    │
 │  FastAPI + uvicorn        │   │  web/public/data/*.json     │
 │  collector.py long-poll   │   │  Updated by GitHub Actions │
-│  SSE fan-out via Redis    │   │  every 2h                  │
+│  SSE fan-out via EventBus │   │  every 2h                  │
 └────────────┬─────────────┘   └────────────────────────────┘
              │
              ▼
 ┌──────────────────────────┐
-│  Upstash Redis (free)     │
+│  Managed Redis (free)     │
+│  Aiven Valkey / Upstash   │
 │  TLS (rediss://)          │
-│  256MB · 500K cmd/mo     │
 └──────────────────────────┘
 ```
 
+> **Event bus:** SSE events fan out through an **in-process bus** by default
+> (`FRI_EVENT_BUS=memory`) — zero Redis pub/sub commands. Set
+> `FRI_EVENT_BUS=redis` only for multi-process deployments (it restores
+> pub/sub fan-out unchanged).
+
 ---
 
-## Step 1: Upstash Redis (free)
+## Step 1: Managed Redis (free)
+
+Any managed Redis/Valkey with a `rediss://` (TLS) connection string works.
+Recommended: **Aiven for Valkey** — free forever, no credit card, and **no
+per-command billing at all** (Upstash's free tier caps at 500K commands/month
+and hard-stops the database when the cap is reached — FRI outgrew it).
+
+**Option A — Aiven Valkey (recommended):**
+
+1. Create a free account at [aiven.io](https://aiven.io/free-valkey-database)
+2. Create a **Valkey** service on the **Free** plan (1 CPU / 1 GB RAM)
+3. Wait for the status to become `Running`, open **Overview → Connection information**
+4. Copy the **Service URI** (click to reveal the password first):
+   ```
+   rediss://default:PASSWORD@HOST.aivencloud.com:PORT
+   ```
+
+**Option B — Upstash Redis (free):**
 
 1. Create a free account at [upstash.com](https://upstash.com)
 2. Create a **Regional Database** (free tier: 256MB, 500K commands/month)
-3. Enable **TLS** (enabled by default on Upstash)
-4. Copy the connection string — it should look like:
+3. Copy the connection string — it should look like:
    ```
    rediss://default:PASSWORD@HOST.upstash.io:6379
    ```
-   > **Important:** The scheme must be `rediss://` (two s's) for TLS. Using `redis://` will cause `Connection closed by server` errors.
+
+> **Important:** The scheme must be `rediss://` (two s's) for TLS. Using `redis://` will cause `Connection closed by server` errors. Paste the full URI the provider's console generates — never type the password by hand (special characters break the URL).
 
 ---
 
@@ -66,8 +88,9 @@ This guide covers deploying FRI to production using free-tier services. The arch
 
    | Variable | Value | Notes |
    |----------|-------|-------|
-   | `REDIS_URL` | `rediss://default:PASSWORD@HOST.upstash.io:6379` | Must use `rediss://` for TLS |
-   | `FRI_COUNTS_INTERVAL` | `120` | Seconds between count updates (Upstash budget) |
+   | `REDIS_URL` | `rediss://default:PASSWORD@HOST...` | Must use `rediss://` for TLS |
+   | `FRI_EVENT_BUS` | `memory` | `memory` (default) = in-process SSE fan-out, zero pub/sub commands; `redis` = legacy pub/sub for multi-process deploys |
+   | `FRI_COUNTS_INTERVAL` | `120` | Seconds between count updates (Redis budget) |
    | `FRI_HEALTH_INTERVAL` | `120` | Seconds between health checks |
    | `FRI_SNAPSHOT_INTERVAL` | `300` | Seconds between full snapshots |
    | `FRI_ROOMS_INTERVAL` | `300` | Seconds between room updates |
@@ -148,9 +171,10 @@ on:
 
 ---
 
-## Upstash Command Budget
+## Redis Command Budget
 
-The free tier allows 500K commands/month. With the recommended intervals:
+With the in-process event bus (default), pub/sub costs **zero** commands.
+Only periodic snapshots and REST reads touch Redis:
 
 | Loop | Interval | Commands/day | Commands/month |
 |------|----------|-------------|----------------|
@@ -158,9 +182,15 @@ The free tier allows 500K commands/month. With the recommended intervals:
 | Health | 120s | ~720 | ~21.6K |
 | Snapshot | 300s | ~288 | ~8.6K |
 | Rooms | 300s | ~288 | ~8.6K |
-| **Total** | | **~2K** | **~60K** |
+| Health snapshot | 300s | ~288 | ~8.6K |
+| **Total** | | **~2.3K** | **~70K** |
 
-Well within the 500K limit. SSE events are pushed the moment data changes — no extra polling cost.
+Comfortably within Upstash's 500K free cap — and a non-metered provider
+(Aiven Valkey) makes the budget moot. Historical note: before the event
+bus, the collector PUBLISHed every ingested message (including full
+backlog replays at each boot) to Redis 24/7 regardless of viewership —
+that alone exhausted 500K commands in under a month. If you set
+`FRI_EVENT_BUS=redis`, budget for that traffic on a metered provider.
 
 ---
 

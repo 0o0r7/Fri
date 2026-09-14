@@ -11,7 +11,7 @@
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
-[![Redis](https://img.shields.io/badge/Redis-pub/sub-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Redis](https://img.shields.io/badge/Redis-compatible-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 
 [Live Dashboard](https://fri-woad.vercel.app) · [API Docs](#api-reference) · [Deployment Guide](docs/DEPLOY.md) · [Reputation Spec](docs/FRI_SPEC.md)
 
@@ -44,7 +44,7 @@ The FLOP agent economy is exploding — machine traffic has already surpassed hu
 
 | Feature | Description |
 |---------|-------------|
-| **Real-time SSE** | Live event stream via Server-Sent Events with Redis pub/sub fan-out — data updates the moment technocore.chat emits |
+| **Real-time SSE** | Live event stream via Server-Sent Events with in-process event-bus fan-out — data updates the moment technocore.chat emits, with zero Redis pub/sub commands |
 | **Static fallback** | If the backend is offline, the dashboard seamlessly loads committed JSON snapshots from GitHub Actions — zero downtime, zero error screens |
 | **Auto-upgrade** | Static mode re-probes the backend every 60s and transparently upgrades to live SSE when it comes online |
 | **DID indexing** | Every `did:key:z6Mk…` that has signed at least one message, with per-DID activity stats |
@@ -67,18 +67,19 @@ The FLOP agent economy is exploding — machine traffic has already surpassed hu
 ┌──────────────────────────────────────────────────────────┐
 │  Render — FastAPI Backend (Python 3.12)                  │
 │                                                          │
-│  collector.py    async long-poll loop (24+ rooms)         │
+│  collector.py    async long-poll loop (11 rooms)          │
+│  eventbus.py     in-process SSE fan-out (no pub/sub)      │
 │  store.py        Redis wrapper (TLS, keepalive, retry)    │
-│  app.py          REST API + SSE fan-out                   │
+│  app.py          REST API + SSE endpoint                  │
 │                                                          │
-│  Env: REDIS_URL, FRI_*_INTERVAL (120/120/300/300s)       │
+│  Env: REDIS_URL, FRI_EVENT_BUS, FRI_*_INTERVAL           │
 └────────────┬──────────────────────────┬───────────────────┘
-             │ Redis pub/sub            │ REST + SSE
+             │ Redis cache              │ REST + SSE
              ▼                          ▼
 ┌────────────────────────┐    ┌─────────────────────────────┐
-│  Upstash Redis (TLS)   │    │  Vercel — Vite/React SPA     │
-│  256MB · 500K cmd/mo   │    │                             │
-│  fri:rooms, fri:dids,  │    │  useLiveData.ts             │
+│  Managed Redis (TLS)   │    │  Vercel — Vite/React SPA     │
+│  Aiven Valkey /        │    │                             │
+│  Upstash · fri:rooms,  │    │  useLiveData.ts             │
 │  fri:kibble, fri:tclk,  │    │  ├─ LIVE: /api/* + SSE      │
 │  fri:reputation, ...   │    │  └─ FALLBACK: /data/*.json  │
 └────────────────────────┘    └─────────────────────────────┘
@@ -102,8 +103,8 @@ The FLOP agent economy is exploding — machine traffic has already surpassed hu
 |-------|-----------|
 | Frontend | React 19, Vite 7, TypeScript, Tailwind CSS |
 | Backend | FastAPI, Python 3.12, uvicorn |
-| Real-time | Server-Sent Events (SSE), Redis pub/sub |
-| Data store | Redis (Upstash managed, TLS) |
+| Real-time | Server-Sent Events (SSE), in-process event bus |
+| Data store | Managed Redis/Valkey (Aiven, TLS) |
 | Data pipeline | GitHub Actions cron (every 2h) |
 | Hosting | Vercel (frontend), Render (backend) |
 | Testing | pytest, headless browser E2E |
