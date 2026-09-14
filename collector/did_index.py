@@ -351,3 +351,27 @@ class DidIndex:
     @property
     def total_dids(self) -> int:
         return max(len(self._dids), self._total_dids_floor)
+
+    def observation_window(self) -> Dict[str, Any]:
+        """Time range + volume the current index actually covers.
+
+        Audit transparency requirement: cumulative counters (total_dids,
+        total_messages_sampled) are meaningless to a consumer who cannot
+        tell WHAT window they observe. This reports the observation range
+        across every tracked DID — oldest first_seen to newest last_active
+        — plus the raw observed volume, so a flood-inflated live number can
+        be told apart from the stable committed batch baseline.
+
+        first_seen/last_active are ISO-8601 "Z" strings written by one
+        code path, so lexicographic min/max is order-correct; None values
+        (legacy entries, ts parse failures) are simply excluded. An empty
+        index yields None/0 rather than raising.
+        """
+        firsts = [s.first_seen for s in self._dids.values() if s.first_seen]
+        lasts = [s.last_active for s in self._dids.values() if s.last_active]
+        return {
+            "window_start": min(firsts) if firsts else None,
+            "window_end": max(lasts) if lasts else None,
+            "messages_observed": self._total_messages_sampled,
+            "unique_dids_observed": self.total_dids,
+        }

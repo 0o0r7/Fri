@@ -152,6 +152,48 @@ class TestCollectorWiring:
         assert event["total_dids"] == 1
         assert published == []  # but no PUBLISH command
 
+    def test_publish_counts_carries_window_metadata(self):
+        """Audit P0: counts travel with the window they observe, so a
+        flood-inflated live number is distinguishable from the committed
+        batch baseline, and flagged DIDs are visible at the counts level."""
+
+        async def run():
+            store = FakeStore()
+            bus = EventBus()
+            await bus.subscribe()
+            collector = CollectorLoop(store, event_bus=bus)
+            collector.did_index.ingest_message(
+                "lobby",
+                {
+                    "from": "did:key:a1",
+                    "ts": "2026-09-14T00:00:00Z",
+                    "text": "hi",
+                    "seq": 1,
+                },
+            )
+            collector.did_index.ingest_message(
+                "lobby",
+                {
+                    "from": "did:key:a1",
+                    "ts": "2026-09-14T00:01:00Z",
+                    "text": "hi again",
+                    "seq": 2,
+                },
+            )
+            await collector._publish_counts()
+            await collector.client.aclose()
+            return store.data.get("fri:counts")
+
+        cached = _run(run())
+        w = cached["window"]
+        assert w["window_start"] == "2026-09-14T00:00:00Z"
+        assert w["window_end"] == "2026-09-14T00:01:00Z"
+        assert w["messages_observed"] == 2
+        assert w["unique_dids_observed"] == 1
+        assert "lobby" in w["monitored_rooms"]
+        assert w["scored_count"] == 0  # no reputation snapshot yet
+        assert cached["flagged_dids"] == 0  # no reputation snapshot yet
+
 
 class TestSseFrame:
     def test_frame_format_matches_frontend_contract(self):

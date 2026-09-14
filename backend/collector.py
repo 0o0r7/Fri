@@ -442,12 +442,24 @@ class CollectorLoop:
 
     async def _publish_counts(self) -> None:
         rep = await self.store.get("fri:reputation") or {}
+        spam = rep.get("spam") or {}
         counts = {
             "total_dids": self.did_index.total_dids,
             "total_rooms": len(self.room_metas),
             "total_jobs": self.kibble_index.total_jobs,
             "total_contracts": self.tclk_index.total_contracts,
             "total_dids_scored": rep.get("total_dids_scored", 0),
+            # Audit P0 (window metadata): raw counters travel with the
+            # window they observe, so a flood-inflated live number is
+            # distinguishable from the committed batch baseline. The
+            # flagged count makes spam visibility symmetric — raw counts
+            # include flagged DIDs, /api/reputation scoring excludes them.
+            "flagged_dids": spam.get("flagged_dids", 0),
+            "window": {
+                **self.did_index.observation_window(),
+                "monitored_rooms": sorted(self.monitored),
+                "scored_count": rep.get("total_dids_scored", 0),
+            },
         }
         await self.store.set("fri:counts", counts)
         await self._emit({"type": "counts", **counts})

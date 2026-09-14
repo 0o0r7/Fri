@@ -16,6 +16,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from collector.did_index import DidIndex, DidStats
 from collector.kibble import KibbleIndex, KibbleJob
@@ -28,6 +29,7 @@ from backend.app import (
     did_score,
     health,
     health_snapshots,
+    meta,
     rooms,
     sse_gate,
 )
@@ -398,3 +400,85 @@ class TestSseGate:
             sse_gate.limit = original_limit
             sse_gate.counts = original_gate
         assert codes == [200, 200, 429, 200]
+
+
+class TestMetaEndpoint:
+    """Audit P0: /api/meta documents methodology, semantics, limitations."""
+
+    def test_meta_documents_methodology_and_rooms(self):
+        m = asyncio.run(meta())
+        # The documented room count is a published contract (audit 2.1:
+        # stale "24+ rooms" claims caused the correction round).
+        assert len(m["monitored_rooms"]) == 11
+        assert "lobby" in m["monitored_rooms"]
+        for key in (
+            "sampling",
+            "room_selection",
+            "batch_vs_live",
+            "hydration_overlap",
+            "scoring",
+            "spam_integrity",
+            "stale_rooms",
+        ):
+            assert key in m["methodology"], key
+            assert len(m["methodology"][key]) > 40, f"{key} must be substantive"
+
+    def test_meta_discloses_spam_semantics_and_cache_policy(self):
+        m = asyncio.run(meta())
+        # Flag semantics must be discoverable: raw counts include flagged
+        # DIDs, scoring excludes them — the exact transparency contract.
+        assert "silently" in m["methodology"]["spam_integrity"]
+        assert m["schema_versions"]["reputation"].startswith("fri-reputation-")
+        assert m["operational"]["cache"]["rest"] == (
+            "public, max-age=30 (snapshot cadence)"
+        )
+        assert m["operational"]["cache"]["health"] == "no-store"
+        assert m["operational"]["event_bus_mode"] in ("memory", "redis")
+
+
+class TestCacheHeaders:
+    """Audit P0: explicit cache semantics, exercised through the full ASGI
+    stack (TestClient) so the raw-ASGI middleware is covered end-to-end."""
+
+    def test_snapshot_gets_public_max_age_30(self):
+        app.state.store = FakeStore()
+        app.state.store.data["fri:counts"] = {"total_dids": 1}
+        client = TestClient(app)  # no context manager → lifespan (Redis) skipped
+        r = client.get("/api/counts")
+        assert r.status_code == 200
+        assert r.headers["cache-control"] == "public, max-age=30"
+
+    def test_meta_also_cacheable(self):
+        client = TestClient(app)
+        r = client.get("/api/meta")
+        assert r.status_code == 200
+        assert r.headers["cache-control"] == "public, max-age=30"
+        assert r.json()["service"]
+
+    def test_health_never_cacheable_even_when_ok(self):
+        app.state.store = FakeStore()
+        app.state.store.data["fri:health"] = {"status": "ok", "stale": False}
+        client = TestClient(app)
+        r = client.get("/api/health")
+        assert r.status_code == 200
+        assert r.headers["cache-control"] == "no-store"
+
+    def test_health_503_also_no_store(self):
+        app.state.store = DownStore()
+        client = TestClient(app)
+        r = client.get("/api/health")
+        assert r.status_code == 503
+        assert r.headers["cache-control"] == "no-store"
+
+    def test_per_did_routes_inherit_cache_policy(self):
+        app.state.store = FakeStore()
+        app.state.store.data["fri:reputation"] = {
+            "dids": [{"did": "did:key:x", "reputation_score": 0.5}]
+        }
+        client = TestClient(app)
+        ok = client.get("/api/did/did:key:x/score")
+        assert ok.status_code == 200
+        assert ok.headers["cache-control"] == "public, max-age=30"
+        miss = client.get("/api/did/did:key:unknown/score")
+        assert miss.status_code == 404
+        assert "cache-control" not in miss.headers  # errors are never cached

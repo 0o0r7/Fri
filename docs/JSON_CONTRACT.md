@@ -318,6 +318,46 @@ def top_rooms(limit: int = 10) -> list:
 
 ---
 
+## Live API transparency (audit P0)
+
+The live service (`/api/*` on the backend) publishes the same payloads plus
+three transparency surfaces:
+
+**`GET /api/meta`** — methodology, monitored-room list, scoring summary,
+spam-flag semantics, known limitations, and operational parameters
+(event-bus mode, cache policy, SSE limits). Static per process; treat it as
+the interpretive key for every other number the API serves.
+
+**`window` block on `GET /api/counts`** — raw counters travel with the
+observation window they cover, so a flood-inflated live number can be told
+apart from the committed batch baseline:
+
+```json
+{
+  "total_dids": 22017,
+  "flagged_dids": 16,
+  "window": {
+    "window_start": "2026-09-07T17:48:13Z",
+    "window_end": "2026-09-14T07:50:00Z",
+    "messages_observed": 8421,
+    "unique_dids_observed": 22017,
+    "monitored_rooms": ["d-blockrewards-feed", "events", "lobby", "..."],
+    "scored_count": 2510
+  }
+}
+```
+
+`flagged_dids` counts DIDs carrying at least one spam flag: their raw counts
+remain in every payload (nothing is silently deleted), while reputation
+scoring excludes their activity.
+
+**`Cache-Control` semantics** — snapshot REST reads are served with
+`Cache-Control: public, max-age=30` (one snapshot cycle); `/api/health` is
+always `no-store` (it is the freshness probe); SSE (`/api/live`) remains
+`no-cache`; error responses are never marked cacheable.
+
+---
+
 ## Caching
 
 All payloads include `generated_at` and `version`. Cache for up to 2 hours (the collector runs every 2h on GitHub Actions). The `Cache-Control` header on static hosts is typically `max-age=7200`.

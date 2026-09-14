@@ -292,3 +292,47 @@ def test_snapshot_total_counts_unchanged_by_spam():
     idx.ingest_message("lobby", _msg(1, "did:key:z6MkSpam", FLOOD_TEMPLATE))
     assert idx.total_dids == 1
     assert idx.snapshot()["total_messages_sampled"] == 1
+
+
+# ---------------------------------------------------------------------------
+# observation_window — audit P0 window metadata
+# ---------------------------------------------------------------------------
+
+
+def test_observation_window_empty_index_is_safe():
+    idx = DidIndex()
+    w = idx.observation_window()
+    assert w["window_start"] is None
+    assert w["window_end"] is None
+    assert w["messages_observed"] == 0
+    assert w["unique_dids_observed"] == 0
+
+
+def test_observation_window_covers_min_max_across_dids():
+    idx = DidIndex()
+    # b1: earlier window | b2: extends both ends | b3: inside b2's range
+    idx.ingest_message("lobby", _msg(1, "did:key:b1", ts="2026-09-07T10:00:00Z"))
+    idx.ingest_message("lobby", _msg(2, "did:key:b2", ts="2026-09-08T09:00:00Z"))
+    idx.ingest_message("lobby", _msg(3, "did:key:b2", ts="2026-09-09T23:00:00Z"))
+    idx.ingest_message("lobby", _msg(4, "did:key:b3", ts="2026-09-08T12:00:00Z"))
+    w = idx.observation_window()
+    assert w["window_start"] == "2026-09-07T10:00:00Z"  # b1 first_seen
+    assert w["window_end"] == "2026-09-09T23:00:00Z"  # b2 last_active
+    assert w["messages_observed"] == 4
+    assert w["unique_dids_observed"] == 3
+
+
+def test_observation_window_ignores_dids_without_timestamps():
+    # A DID hydrated from a legacy baseline without ts fields must not
+    # crash the window computation nor produce a bogus range.
+    idx = DidIndex()
+    idx.hydrate({
+        "total_messages_sampled": 7,
+        "dids": [{"did": "did:key:noTs", "messages_signed": 7}],
+    })
+    idx.ingest_message("lobby", _msg(1, "did:key:withTs", ts="2026-09-09T08:00:00Z"))
+    w = idx.observation_window()
+    assert w["window_start"] == "2026-09-09T08:00:00Z"
+    assert w["window_end"] == "2026-09-09T08:00:00Z"
+    assert w["messages_observed"] == 8  # hydrated 7 + 1 live
+    assert w["unique_dids_observed"] == 2

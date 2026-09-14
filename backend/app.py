@@ -20,10 +20,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Receive, Scope, Send
 
-from collector.reputation import ReputationScorer
+from collector.reputation import SCHEMA_VERSION, ReputationScorer
 
-from .collector import REDIS_CHANNEL, CollectorLoop
+from .collector import MONITORED_ROOMS, REDIS_CHANNEL, CollectorLoop
 from .eventbus import EventBus
 from .store import Store
 
@@ -94,6 +96,47 @@ class SseGate:
 
 
 sse_gate = SseGate(SSE_PER_IP_LIMIT)
+
+
+class CacheHeaderMiddleware:
+    """Audit P0: explicit cache semantics on every /api response.
+
+    Snapshot REST reads are safe to share-cache for one snapshot cycle
+    (30s), so CDN/browser re-polls stop hammering Redis on every view.
+    /api/health must never be cached — it is the freshness probe; a cached
+    "ok" would mask a dead backend and block the static fallback. /api/live
+    sets its own no-cache headers (streaming), and non-2xx responses are
+    left untouched so error answers are never cached.
+
+    Implemented as raw ASGI (not BaseHTTPMiddleware) deliberately: the SSE
+    stream must pass through with no extra response wrapper — wrapping has
+    historically broken client-disconnect detection and heartbeats.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not scope["path"].startswith("/api/"):
+            await self.app(scope, receive, send)
+            return
+        path = scope["path"]
+
+        async def send_wrapper(message) -> None:
+            if message["type"] == "http.response.start":
+                if path == "/api/health":
+                    MutableHeaders(scope=message)["Cache-Control"] = "no-store"
+                elif (
+                    path != "/api/live"
+                    and scope["method"] == "GET"
+                    and 200 <= message["status"] < 300
+                ):
+                    MutableHeaders(scope=message)["Cache-Control"] = (
+                        "public, max-age=30"
+                    )
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
 
 
 async def _retry_collector_start(
@@ -180,6 +223,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(CacheHeaderMiddleware)
 
 
 @app.exception_handler(RedisConnectionError)
@@ -260,6 +304,91 @@ async def tclk():
 @app.get("/api/reputation")
 async def reputation():
     return await app.state.store.get("fri:reputation") or {"dids": []}
+
+
+@app.get("/api/meta")
+async def meta():
+    """Methodology + semantics for every served number (audit P0).
+
+    Each figure this API publishes is an OBSERVATION with a scope, not
+    ground truth about the whole network. This endpoint documents the
+    scope (monitored rooms, observation window — see the `window` block
+    in /api/counts), the scoring method, and the known failure modes, so
+    consumers can interpret — or challenge — the numbers instead of
+    over-trusting them. Static per process; cached like other snapshots.
+    """
+    return {
+        "service": "FRI — Flop Reputation Index",
+        "base_url": BASE_URL,
+        "schema_versions": {"reputation": SCHEMA_VERSION},
+        "monitored_rooms": sorted(MONITORED_ROOMS),
+        "methodology": {
+            "sampling": (
+                "Long-poll sampling of the monitored rooms via the "
+                "technocore public API, seeded at boot from the committed "
+                "baseline (data/*.json) and then updated live. Raw counters "
+                "are cumulative observations of those rooms only — never "
+                "estimates of the whole network."
+            ),
+            "room_selection": (
+                "%d rooms are monitored (key protocol rooms + events). The "
+                "set is deliberately small: technocore rate-limits (HTTP "
+                "429) aggressive polling, so breadth would trade reliability "
+                "for coverage. Dead rooms stay in the snapshot marked stale "
+                "rather than being silently dropped." % len(MONITORED_ROOMS)
+            ),
+            "batch_vs_live": (
+                "GitHub Actions batch runs produce the committed baseline "
+                "dids.json used at boot; the live service adds observations "
+                "on top. Under message floods the live total_dids can exceed "
+                "the batch baseline by a large factor — compare the window "
+                "block in /api/counts and /api/health/snapshots before "
+                "drawing conclusions from either."
+            ),
+            "hydration_overlap": (
+                "On boot the collector re-hydrates from the committed "
+                "baseline; messages already counted there are not re-fetched "
+                "and live ingest wins for known DIDs. Boot-relative metrics "
+                "(peak rate windows) reset on every deploy or spin-down; "
+                "committed cumulative counters persist."
+            ),
+            "scoring": (
+                "Reputation is a weighted, log-scaled composite (activity, "
+                "rooms, useful, posted/not, kibble, TCLK). Weights and caps "
+                "are published in every /api/reputation snapshot. Activity "
+                "uses effective_messages = messages_signed - low_signal_msgs: "
+                "spam-flagged volume buys no reputation."
+            ),
+            "spam_integrity": (
+                "Every message is classified into exactly one category "
+                "(clean / phrase / template / campaign) and DIDs earn flags "
+                "(phrase_spam, template_flood, campaign_template, "
+                "rate_burst, new_did_flood). Flagged DIDs keep their raw "
+                "counts and stay fully queryable — nothing is silently "
+                "deleted — but their activity contributes zero to reputation "
+                "scores. High-rate machine rooms are exempt from rate flags "
+                "so legitimate feeds are not punished for volume."
+            ),
+            "stale_rooms": (
+                "A monitored room that stops returning data keeps its last "
+                "known state marked stale in /api/rooms; it is not dropped, "
+                "so room totals never shrink merely because a room went "
+                "quiet."
+            ),
+        },
+        "limitations": [
+            "Only monitored rooms are observed — off-room activity is invisible.",
+            "total_dids includes flagged/spam DIDs (raw observation); reputation scoring excludes them.",
+            "Restart cycles (e.g. free-tier spin-down) reset live rate windows and boot-relative metrics; committed counters persist.",
+            "Single-instance event bus (FRI_EVENT_BUS=%s): SSE fan-out is per-process." % EVENT_BUS_MODE,
+            "Snapshot history is capped at %dh (the store retains 7 days)." % MAX_SNAPSHOT_HOURS,
+        ],
+        "operational": {
+            "event_bus_mode": EVENT_BUS_MODE,
+            "sse_per_ip_limit": SSE_PER_IP_LIMIT,
+            "cache": {"rest": "public, max-age=30 (snapshot cadence)", "sse": "no-cache", "health": "no-store"},
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
