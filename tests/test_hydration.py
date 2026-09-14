@@ -447,17 +447,37 @@ class TestRealDataHydration:
         # not derive it from the truncated list.
         assert fresh.total_dids == payload["total_dids"]
         assert fresh.total_dids >= len(payload["dids"])
+        # Since the Actions baseline runs the v1.1 collector, entries carry
+        # real spam fields. Round-trip rules:
+        #   - EVERY serialized field except the two below must round-trip
+        #     exactly — including all persisted spam counters.
+        #   - peak_msgs_per_min is boot-relative: it derives from rolling
+        #     10-min rate buckets that are deliberately not serialized.
+        #   - Flag semantics: counter-derived flags (phrase_spam,
+        #     template_flood) MUST survive hydration; process-local or
+        #     time-relative flags (rate_burst: rate buckets,
+        #     campaign_template: in-memory campaign LRU, new_did_flood:
+        #     first_seen recency vs "now") legitimately may not — they
+        #     rebuild organically from live traffic after boot.
+        skip_keys = {"peak_msgs_per_min", "spam_flags"}
+        persistent_flags = {"phrase_spam", "template_flood"}
         for entry in payload["dids"][:5]:
             hyd = fresh.get(entry["did"]).to_dict()
-            # Legacy projection: every v1.0 field round-trips exactly. The
-            # v1.1 spam-integrity additions (phrase/template/campaign_msgs,
-            # low_signal_msgs, spam_ratio, peak_msgs_per_min, spam_flags)
-            # hydrate as zeros for pre-v1.1 baselines.
-            assert {k: hyd[k] for k in entry} == entry
-            assert hyd["phrase_msgs"] == 0
-            assert hyd["template_msgs"] == 0
-            assert hyd["campaign_msgs"] == 0
-            assert hyd["spam_flags"] == []
+            expected = {k: v for k, v in entry.items() if k not in skip_keys}
+            assert {k: hyd[k] for k in expected} == expected, entry["did"]
+            committed_flags = set(entry.get("spam_flags") or [])
+            hyd_flags = set(hyd.get("spam_flags") or [])
+            assert committed_flags & persistent_flags <= hyd_flags, entry["did"]
+            assert hyd_flags <= committed_flags, entry["did"]
+            for key in (
+                "phrase_msgs",
+                "template_msgs",
+                "campaign_msgs",
+                "low_signal_msgs",
+                "spam_ratio",
+            ):
+                if key in entry:
+                    assert hyd[key] == entry[key], (entry["did"], key)
 
     def test_real_kibble_roundtrip(self):
         payload = json.loads((DATA_DIR / "kibble.json").read_text())
