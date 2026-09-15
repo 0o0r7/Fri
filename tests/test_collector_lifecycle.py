@@ -19,18 +19,46 @@ from backend.eventbus import EventBus
 
 
 class FakeStore:
-    """Async in-memory store; optional failing publish (redis-mode outage)."""
+    """Async in-memory store; optional failing publish (redis-mode outage).
+
+    Implements the durable-persistence surface (scan/mget/mset/sets)
+    used by the collector's no-DID-forgotten layer.
+    """
 
     def __init__(self, fail_publish: bool = False) -> None:
         self.data: dict = {}
         self.published: list[tuple[str, dict]] = []
         self.fail_publish = fail_publish
+        self._sets: dict[str, set] = {}
 
     async def set(self, key, value):
         self.data[key] = value
 
     async def get(self, key):
         return self.data.get(key)
+
+    async def scan_keys(self, match: str, chunk: int = 500):
+        import fnmatch
+
+        return [k for k in self.data if fnmatch.fnmatch(k, match)]
+
+    async def mget_raw(self, keys):
+        import json as _json
+
+        out = []
+        for k in keys:
+            v = self.data.get(k)
+            out.append(v if isinstance(v, str) else (_json.dumps(v) if v is not None else None))
+        return out
+
+    async def mset_raw(self, mapping):
+        self.data.update(mapping)
+
+    async def sadd(self, key, members):
+        self._sets.setdefault(key, set()).update(members)
+
+    async def smembers(self, key):
+        return set(self._sets.get(key, set()))
 
     async def publish(self, channel, message):
         self.published.append((channel, message))
@@ -117,7 +145,7 @@ class TestLifecycle:
             "fri:counts",
             "fri:health",
         }
-        assert task_count == 6
+        assert task_count == 9  # 6 core loops + persist + backfill + registry
         assert last_seq == 2  # seeded from the mock lobby backlog
         assert dids >= 2  # committed baseline hydration + live seed
         assert cancelled

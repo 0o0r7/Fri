@@ -26,19 +26,24 @@ import httpx
 
 from collector.config import (
     ALWAYS_POLL_ROOMS,
+    DID_PERSIST_INTERVAL_S,
+    DID_PERSIST_PREFIX,
     PROTOCOL_VERSIONS,
     ROOMS_LIMIT,
     ROOM_MESSAGE_LIMITS,
+    SEQ_WATERMARK_KEY,
     TOP_N,
     USER_AGENT,
 )
-from collector.did_index import DidIndex
+from collector.did_index import DidIndex, DidStats, did_note_fingerprint
 from collector.kibble import KibbleIndex
 from collector.reputation import ReputationScorer
 from collector.score import score_room
 from collector.tclk import TclkIndex
 
+from .backfill import backfill_loop, parse_watermarks, persist_watermarks
 from .eventbus import EventBus
+from .registry import registry_loop
 from .store import Store
 
 log = logging.getLogger("fri.collector")
@@ -99,6 +104,13 @@ class CollectorLoop:
         self.room_metas: dict[str, dict[str, Any]] = {}
         self.room_messages: dict[str, list[dict[str, Any]]] = {}
         self.last_seq: dict[str, int] = {}
+        # Per-room seq watermarks — the exact-once contract across seed,
+        # poll, backfill and boots. Live paths (seed/poll) own the top of
+        # each ring (ingest seq > hi); the backfill owns the bottom
+        # (ingest seq < lo; for unmonitored rooms also the top). See
+        # backend/backfill.py.
+        self._seq_lo: dict[str, int | None] = {}
+        self._seq_hi: dict[str, int | None] = {}
         self.did_index = DidIndex()
         self.kibble_index = KibbleIndex()
         self.tclk_index = TclkIndex()
@@ -122,6 +134,11 @@ class CollectorLoop:
         # 1. Seed Redis from committed JSON so frontend has data immediately
         await self._seed_from_committed()
 
+        # 1b. Durable layer: merge the persisted full DID index + per-room
+        # seq watermarks BEFORE any live seeding, so the exact-once
+        # contract holds across boots (see backend/backfill.py).
+        await self._rehydrate_durable()
+
         # 2. Fetch room metadata
         await self._fetch_rooms()
 
@@ -142,9 +159,20 @@ class CollectorLoop:
             asyncio.create_task(self._snapshot_loop(), name="snapshot-loop"),
             asyncio.create_task(self._counts_loop(), name="counts-loop"),
             asyncio.create_task(self._health_loop(), name="health-loop"),
-            asyncio.create_task(self._health_snapshot_loop(), name="health-snapshot-loop"),
+            asyncio.create_task(
+                self._health_snapshot_loop(), name="health-snapshot-loop"
+            ),
+            # Durability layer: full-ring export sweeps, the persistent
+            # did-note registry, and write-through index persistence.
+            asyncio.create_task(self._persist_loop(), name="did-persist"),
+            asyncio.create_task(backfill_loop(self), name="backfill"),
+            asyncio.create_task(registry_loop(self), name="did-registry"),
         ]
-        log.info("Collector started — monitoring %d rooms", len(self.monitored))
+        log.info(
+            "Collector started — monitoring %d rooms "
+            "(backfill + registry sweeps running in background)",
+            len(self.monitored),
+        )
 
     async def stop(self) -> None:
         log.info("Stopping collector loop")
@@ -152,6 +180,114 @@ class CollectorLoop:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
         await self.client.aclose()
+
+    # ------------------------------------------------------------------
+    # Durable persistence — "no DID is forgotten"
+    # ------------------------------------------------------------------
+
+    async def _rehydrate_durable(self) -> None:
+        """Merge the persisted full DID index + seq watermarks from the store.
+
+        Restarts and free-tier spin-downs used to reset the live index to
+        the top-500 committed baseline, forgetting every other DID the
+        process had ever observed. The write-through store keys
+        (fri:d:<fingerprint>) are the durable truth: re-merged at boot
+        with max-merge semantics (see DidIndex.hydrate_entry), then live
+        ingest continues on top.
+
+        Self-healing: if the store holds watermarks but ZERO did entries
+        (provider data loss / manual flush), the watermarks are dropped —
+        re-ingesting retained messages is the correct recovery there;
+        honoring them would strand the counters at zero forever.
+        """
+        # Watermarks first — seeding and polling must respect them.
+        try:
+            wm = parse_watermarks(await self.store.get(SEQ_WATERMARK_KEY))
+        except Exception:
+            wm = {}
+        for room, marks in wm.items():
+            self._seq_lo[room] = marks["lo"]
+            self._seq_hi[room] = marks["hi"]
+
+        loaded = 0
+        try:
+            keys = await self.store.scan_keys(f"{DID_PERSIST_PREFIX}*")
+            if keys:
+                values = await self.store.mget_raw(keys)
+                for raw in values:
+                    if not raw:
+                        continue
+                    try:
+                        entry = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(entry, dict):
+                        if self.did_index.hydrate_entry(entry):
+                            loaded += 1
+        except Exception as e:
+            log.warning("durable did rehydrate failed: %s", e)
+
+        if loaded == 0 and wm:
+            log.warning(
+                "durable did store empty but %d watermarks present — "
+                "assuming provider data loss, resetting watermarks",
+                len(wm),
+            )
+            self._seq_lo.clear()
+            self._seq_hi.clear()
+
+        log.info(
+            "Durable rehydration: %d did entries merged, "
+            "%d room watermarks restored",
+            loaded,
+            len(wm) if loaded else 0,
+        )
+
+    @staticmethod
+    def _durable_entry(stats: DidStats) -> dict[str, Any]:
+        """Compact store shape for one DID (published view minus derived)."""
+        return {
+            "did": stats.did,
+            "messages_signed": stats.messages_signed,
+            "first_seen": stats.first_seen,
+            "last_active": stats.last_active,
+            "rooms_breakdown": dict(stats.rooms),
+            "total_text_chars": stats.total_text_chars,
+            "phrase_msgs": stats.phrase_msgs,
+            "template_msgs": stats.template_msgs,
+            "campaign_msgs": stats.campaign_msgs,
+            "profile_bio": stats.profile_bio,
+            "identity_note": stats.identity_note,
+        }
+
+    async def _persist_loop(self) -> None:
+        """Write dirty DIDs + seq watermarks to the store every cycle.
+
+        The store (Aiven Valkey) does not spin down — it is the durability
+        anchor that lets the Render service restart without forgetting.
+        """
+        while True:
+            await asyncio.sleep(DID_PERSIST_INTERVAL_S)
+            try:
+                await self._flush_did_persistence()
+            except Exception as e:
+                log.warning("did persist cycle failed: %s", e)
+
+    async def _flush_did_persistence(self) -> None:
+        dirty = self.did_index.pop_dirty()
+        if dirty:
+            mapping: dict[str, str] = {}
+            for did in dirty:
+                stats = self.did_index.get(did)
+                if stats is None:
+                    continue
+                fp = did_note_fingerprint(did)
+                mapping[f"{DID_PERSIST_PREFIX}{fp}"] = json.dumps(
+                    self._durable_entry(stats), separators=(",", ":")
+                )
+            if mapping:
+                await self.store.mset_raw(mapping)
+        await persist_watermarks(self)
 
     # ------------------------------------------------------------------
     # Seeding
@@ -263,7 +399,14 @@ class CollectorLoop:
             for msg in messages:
                 self._ingest(room, msg)
             if messages:
-                self.last_seq[room] = max(m.get("seq", 0) for m in messages)
+                seqs = [m.get("seq", 0) for m in messages]
+                self.last_seq[room] = max(seqs)
+                # Fresh discovery (no watermark yet): the whole returned
+                # tail was ingested — record its bottom so the backfill
+                # sweep stops strictly below it.
+                if self._seq_lo.get(room) is None:
+                    self._seq_lo[room] = min(seqs)
+                    self._seq_hi[room] = max(seqs)
             self.technocore_ok = True
             self.last_success = time.time()
         except Exception as e:
@@ -337,7 +480,19 @@ class CollectorLoop:
                             # recovered. Memory mode cannot fail; degrade
                             # the SSE feed instead, keep counters exact.
                             log.debug("Emit failed (ingest continues): %s", e)
-                    self.last_seq[room] = max(m.get("seq", 0) for m in messages)
+                    seqs = [m.get("seq", 0) for m in messages]
+                    self.last_seq[room] = max(seqs)
+                    # Maintain the live-path watermark (fresh discovery
+                    # records the bottom of the first window; incremental
+                    # polls only raise the top).
+                    if self._seq_lo.get(room) is None:
+                        self._seq_lo[room] = min(seqs)
+                        self._seq_hi[room] = max(seqs)
+                    else:
+                        hi_old = self._seq_hi.get(room)
+                        self._seq_hi[room] = max(
+                            hi_old if hi_old is not None else 0, max(seqs)
+                        )
                 self.technocore_ok = True
                 self.last_success = time.time()
                 backoff = 1.0
@@ -351,14 +506,38 @@ class CollectorLoop:
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 30.0)
 
-    def _ingest(self, room: str, msg: dict[str, Any]) -> None:
-        """Feed a message to all indices + update rolling window."""
+    def _ingest(
+        self,
+        room: str,
+        msg: dict[str, Any],
+        source: str = "live",
+        window: bool = True,
+    ) -> None:
+        """Feed a message to all indices (+ optional live rolling window).
+
+        Exact-once contract: live paths (seed/poll) ingest only seq above
+        the room's high-water mark; the backfill (source="backfill") does
+        its own below-the-floor check in ingest_ring. Messages without a
+        seq (anonymous posts) cannot be deduped and pass through — they
+        carry no per-DID counters.
+        """
+        seq = msg.get("seq")
+        if seq is not None:
+            try:
+                seq = int(seq)
+            except (TypeError, ValueError):
+                seq = None
+        if source == "live" and seq is not None:
+            hi = self._seq_hi.get(room)
+            if hi is not None and seq <= hi:
+                return  # already counted (seed overlap / redelivery)
         self.did_index.ingest_message(room, msg)
         self.kibble_index.ingest_message(room, msg)
         self.tclk_index.ingest_message(room, msg)
-        msgs = self.room_messages.get(room, [])
-        msgs.append(msg)
-        self.room_messages[room] = msgs[-ROOM_MSG_WINDOW:]
+        if window:
+            msgs = self.room_messages.get(room, [])
+            msgs.append(msg)
+            self.room_messages[room] = msgs[-ROOM_MSG_WINDOW:]
 
     # ------------------------------------------------------------------
     # Periodic loops

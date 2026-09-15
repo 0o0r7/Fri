@@ -89,6 +89,51 @@ class Store:
     async def publish(self, channel: str, message: dict[str, Any]) -> None:
         await self._redis.publish(channel, json.dumps(message))
 
+    # ------------------------------------------------------------------
+    # Durable per-DID persistence (2026-09 "no DID is forgotten")
+    # ------------------------------------------------------------------
+
+    async def scan_keys(self, match: str, chunk: int = 500) -> list[str]:
+        """All keys matching a glob pattern (SCAN, never KEYS)."""
+        out: list[str] = []
+        async for key in self._redis.scan_iter(match=match, count=chunk):
+            out.append(key)
+        return out
+
+    async def mget_raw(self, keys: list[str]) -> list[str | None]:
+        """Bulk raw-string GET in chunks (values are compact JSON)."""
+        out: list[str | None] = []
+        for i in range(0, len(keys), 500):
+            chunk = keys[i : i + 500]
+            out.extend(await self._redis.mget(chunk))
+        return out
+
+    async def mset_raw(self, mapping: dict[str, str]) -> None:
+        """Bulk raw-string SET via non-transactional pipeline."""
+        if not mapping:
+            return
+        items = list(mapping.items())
+        for i in range(0, len(items), 500):
+            chunk = items[i : i + 500]
+            pipe = self._redis.pipeline(transaction=False)
+            for key, value in chunk:
+                pipe.set(key, value)
+            await pipe.execute()
+
+    async def sadd(self, key: str, members: list[str]) -> None:
+        """Add members to a set (registry known-fingerprint tracking)."""
+        if not members:
+            return
+        for i in range(0, len(members), 500):
+            await self._redis.sadd(key, *members[i : i + 500])
+
+    async def smembers(self, key: str) -> set[str]:
+        """All members of a set; empty set when the key is absent."""
+        try:
+            return set(await self._redis.smembers(key))
+        except Exception:
+            return set()
+
     def pubsub(self):
         return self._redis.pubsub()
 

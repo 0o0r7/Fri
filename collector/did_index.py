@@ -97,6 +97,12 @@ class DidStats:
     phrase_msgs: int = 0      # farming phrases / emoji-only / no-signal text
     template_msgs: int = 0    # repeats this DID's own earlier template
     campaign_msgs: int = 0    # template currently shared by many DIDs
+    # Identity registry (DID-note sync, 2026-09 durability response):
+    # self-published profile loaded from the persistent /kv/did-* note
+    # namespace. A registry-only DID has messages_signed == 0 until any
+    # signed message is observed — it stays indexed and queryable either way.
+    profile_bio: Optional[str] = None
+    identity_note: bool = False
     # Rate window (not serialized — rebuilt organically after boot)
     _rate_buckets: Dict[int, int] = field(
         default_factory=dict, repr=False, compare=False
@@ -192,6 +198,13 @@ class DidStats:
             else 0.0,
             "peak_msgs_per_min": self.peak_msgs_per_min,
             "spam_flags": self.spam_flags,
+            # Identity registry (v1.2) — present when the DID published a
+            # did-note; absent otherwise so legacy consumers see no change.
+            **(
+                {"profile_bio": self.profile_bio, "identity_note": True}
+                if self.identity_note
+                else {}
+            ),
         }
 
 
@@ -219,6 +232,19 @@ class DidIndex:
         # as of 2026-09-14), so hydrate() must restore the published total
         # instead of deriving it from the truncated list.
         self._total_dids_floor: int = 0
+        # DIDs whose stats changed since the last durable-persistence flush
+        # (backend write-through to the fri:d:* store keys). The batch
+        # pipeline never flushes, so the set simply grows there unused.
+        self._dirty: set = set()
+
+    def mark_dirty(self, did: str) -> None:
+        self._dirty.add(did)
+
+    def pop_dirty(self) -> set:
+        """Return and clear the dirty set (persistence flush boundary)."""
+        out = self._dirty
+        self._dirty = set()
+        return out
 
     def ingest_message(self, room: str, message: Dict[str, Any]) -> None:
         """Update the index with one message. Only signed messages count."""
@@ -234,6 +260,31 @@ class DidIndex:
             stats = DidStats(did=frm)
             self._dids[frm] = stats
         stats.ingest(room=room, ts=ts, text=text, spam_category=verdict.category)
+        self._dirty.add(frm)
+
+    def register_identity(self, did: str, bio: str | None = None) -> bool:
+        """Register a DID from the persistent did-note registry (no messages).
+
+        The /kv/did-* namespace survives room-ring churn, so it is the
+        network's durable identity ledger. A DID known only through its
+        note gets a zero-activity entry carrying the self-published bio —
+        findable via /api/dids?q= and /api/did/{did}/profile — and any
+        later observed message upgrades the same entry in place.
+
+        Idempotent: re-registering a known DID only refreshes the bio.
+        Returns True when a new entry was created.
+        """
+        stats = self._dids.get(did)
+        if stats is None:
+            stats = DidStats(did=did, identity_note=True, profile_bio=bio)
+            self._dids[did] = stats
+            self._dirty.add(did)
+            return True
+        stats.identity_note = True
+        if bio:
+            stats.profile_bio = bio
+        self._dirty.add(did)
+        return False
 
     def ingest_messages(self, room: str, messages: List[Dict[str, Any]]) -> None:
         for m in messages:
@@ -343,9 +394,106 @@ class DidIndex:
                 phrase_msgs=_clamp_count(entry.get("phrase_msgs")),
                 template_msgs=_clamp_count(entry.get("template_msgs")),
                 campaign_msgs=_clamp_count(entry.get("campaign_msgs")),
+                profile_bio=entry.get("profile_bio"),
+                identity_note=bool(entry.get("identity_note")),
             )
+            self._dirty.add(did)
             restored += 1
         return restored
+
+    def hydrate_entry(self, entry: Dict[str, Any]) -> str | None:
+        """Merge ONE durable per-DID entry (fri:d:* payload) into the index.
+
+        Unlike hydrate() (baseline restore, skip-if-known), this MERGES:
+        the durable entry and any already-live state each observe a
+        partially overlapping message set, so every counter takes the MAX
+        of the two views, first_seen the MIN and last_active the MAX.
+        Adding counters instead would double-count the overlap.
+
+        Returns the did when a merge/insert happened, else None.
+        """
+        did = entry.get("did")
+        if not did or not isinstance(did, str):
+            return None
+
+        def _int(value: Any) -> int:
+            try:
+                return max(0, int(value or 0))
+            except (TypeError, ValueError):
+                return 0
+
+        messages = _int(entry.get("messages_signed"))
+        rooms_in = entry.get("rooms_breakdown") or {}
+        if not isinstance(rooms_in, dict):
+            rooms_in = {}
+        existing = self._dids.get(did)
+        if existing is None:
+            self._dids[did] = DidStats(
+                did=did,
+                first_seen=entry.get("first_seen"),
+                last_active=entry.get("last_active"),
+                messages_signed=messages,
+                rooms={str(k): _int(v) for k, v in rooms_in.items()},
+                total_text_chars=_int(entry.get("total_text_chars")),
+                phrase_msgs=_int(entry.get("phrase_msgs")),
+                template_msgs=_int(entry.get("template_msgs")),
+                campaign_msgs=_int(entry.get("campaign_msgs")),
+                profile_bio=entry.get("profile_bio"),
+                identity_note=bool(entry.get("identity_note")),
+            )
+            return did
+
+        # Merge into existing live state — max per counter (both views are
+        # cumulative observations of an overlapping window).
+        if messages > existing.messages_signed:
+            existing.messages_signed = messages
+        for room, count in rooms_in.items():
+            count = _int(count)
+            if count > existing.rooms.get(room, 0):
+                existing.rooms[str(room)] = count
+        if _int(entry.get("total_text_chars")) > existing.total_text_chars:
+            existing.total_text_chars = _int(entry.get("total_text_chars"))
+        existing.phrase_msgs = max(existing.phrase_msgs, _int(entry.get("phrase_msgs")))
+        existing.template_msgs = max(
+            existing.template_msgs, _int(entry.get("template_msgs"))
+        )
+        existing.campaign_msgs = max(
+            existing.campaign_msgs, _int(entry.get("campaign_msgs"))
+        )
+        fs, la = entry.get("first_seen"), entry.get("last_active")
+        if fs and (existing.first_seen is None or fs < existing.first_seen):
+            existing.first_seen = fs
+        if la and (existing.last_active is None or la > existing.last_active):
+            existing.last_active = la
+        if entry.get("profile_bio") and not existing.profile_bio:
+            existing.profile_bio = entry["profile_bio"]
+        existing.identity_note = existing.identity_note or bool(
+            entry.get("identity_note")
+        )
+        return did
+
+    def search(self, query: str, limit: int = 500) -> List[DidStats]:
+        """Substring search over the FULL index (did + fingerprint).
+
+        The published snapshot caps at top-500 by volume, which makes any
+        low-volume or registry-only DID unfindable through /api/dids —
+        unacceptable for a reputation oracle ("every DID ever observed
+        stays queryable"). This scans all tracked DIDs; case-insensitive
+        on the did string, prefix-insensitive on the 16-hex fingerprint.
+        """
+        q = (query or "").strip().lower()
+        if not q:
+            return []
+        out: List[DidStats] = []
+        for stats in self._dids.values():
+            if q in stats.did.lower() or q in did_note_fingerprint(stats.did):
+                out.append(stats)
+                if len(out) >= limit:
+                    break
+        out.sort(
+            key=lambda s: (-s.messages_signed, -len(s.rooms), s.did),
+        )
+        return out
 
     # Convenience for the collector
     @property

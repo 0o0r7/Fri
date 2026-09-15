@@ -14,6 +14,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,10 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("fri.api")
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 BASE_URL = os.environ.get("TECHNOCORE_BASE_URL", "https://technocore.chat")
@@ -287,7 +292,40 @@ async def rooms():
 
 
 @app.get("/api/dids")
-async def dids():
+async def dids(q: str | None = None):
+    """DID index snapshot — or a full-index search when `q` is present.
+
+    The published snapshot caps per-DID detail at the top-500 by volume;
+    a low-volume or registry-only DID would be unfindable through it.
+    With ?q= the query runs against the LIVE full index (every DID ever
+    observed or registered — substring match on the did string and the
+    16-hex fingerprint), so "every DID stays queryable" actually holds.
+    """
+    if q and q.strip():
+        collector = getattr(app.state, "collector", None)
+        if collector is not None and getattr(app.state, "collector_ready", False):
+            matches = collector.did_index.search(q, limit=500)
+            return {
+                "version": "1.2",
+                "generated_at": _now(),
+                "source": BASE_URL,
+                "query": q.strip(),
+                "total_dids": collector.did_index.total_dids,
+                "total_messages_sampled": collector.did_index._total_messages_sampled,
+                "dids": [s.to_dict() for s in matches],
+            }
+        # Collector not ready — best-effort filter over the cached view.
+        payload = await app.state.store.get("fri:dids") or {"dids": []}
+        needle = q.strip().lower()
+        payload = {
+            **payload,
+            "query": needle,
+            "dids": [
+                d for d in payload.get("dids", [])
+                if isinstance(d, dict) and needle in (d.get("did") or "").lower()
+            ],
+        }
+        return payload
     return await app.state.store.get("fri:dids") or {"dids": []}
 
 
@@ -324,26 +362,45 @@ async def meta():
         "monitored_rooms": sorted(MONITORED_ROOMS),
         "methodology": {
             "sampling": (
-                "Long-poll sampling of the monitored rooms via the "
-                "technocore public API, seeded at boot from the committed "
-                "baseline (data/*.json) and then updated live. Raw counters "
-                "are cumulative observations of those rooms only — never "
-                "estimates of the whole network."
+                "Cumulative observation: at boot the collector hydrates "
+                "from the committed baseline, re-merges the durable "
+                "per-DID store, then a background sweep ingests the FULL "
+                "retained ring of every major room via /r/<room>/export "
+                "(seq-watermarked so nothing is double-counted), long-poll "
+                "keeps monitored rooms live, and the persistent did-note "
+                "registry indexes every self-published identity. Raw "
+                "counters are cumulative observations, never estimates of "
+                "the whole network."
             ),
             "room_selection": (
-                "%d rooms are monitored (key protocol rooms + events). The "
-                "set is deliberately small: technocore rate-limits (HTTP "
-                "429) aggressive polling, so breadth would trade reliability "
-                "for coverage. Dead rooms stay in the snapshot marked stale "
-                "rather than being silently dropped." % len(MONITORED_ROOMS)
+                "%d rooms are long-polled (key protocol rooms + events). "
+                "Breadth comes from the periodic export sweep instead: "
+                "technocore rate-limits (HTTP 429) aggressive polling, so "
+                "the sweep reads each room's full ring at a polite cadence "
+                "rather than holding hundreds of connections open. Dead "
+                "rooms stay in the snapshot marked stale rather than being "
+                "silently dropped." % len(MONITORED_ROOMS)
             ),
             "batch_vs_live": (
                 "GitHub Actions batch runs produce the committed baseline "
                 "dids.json used at boot; the live service adds observations "
-                "on top. Under message floods the live total_dids can exceed "
-                "the batch baseline by a large factor — compare the window "
-                "block in /api/counts and /api/health/snapshots before "
-                "drawing conclusions from either."
+                "on top and persists them durably (per-DID store keys + seq "
+                "watermarks), so restarts and spin-downs no longer reset "
+                "the index. Under message floods the live total_dids can "
+                "exceed the batch baseline by a large factor — compare the "
+                "window block in /api/counts and /api/health/snapshots "
+                "before drawing conclusions from either."
+            ),
+            "durability": (
+                "The source chat retains only ~10 MiB per room (hours under "
+                "flood traffic) and forgets everything older. FRI is the "
+                "archive: every DID once observed is persisted and "
+                "re-merged at boot, and DIDs that published a did-note stay "
+                "indexed through the persistent /kv/did-* registry even "
+                "when all their messages churned out of every ring before "
+                "they were ever sampled. Identity notes are "
+                "self-published (identity_note: true) and carry no "
+                "activity counters until real signed messages are seen."
             ),
             "hydration_overlap": (
                 "On boot the collector re-hydrates from the committed "
@@ -377,9 +434,13 @@ async def meta():
             ),
         },
         "limitations": [
-            "Only monitored rooms are observed — off-room activity is invisible.",
+            "Messages that churned out of technocore's ~10 MiB room rings "
+            "before being observed are unrecoverable at the source; FRI "
+            "indexes everything retained plus every self-published did-note, "
+            "and keeps anything it has observed forever.",
             "total_dids includes flagged/spam DIDs (raw observation); reputation scoring excludes them.",
-            "Restart cycles (e.g. free-tier spin-down) reset live rate windows and boot-relative metrics; committed counters persist.",
+            "Registry-only identities (identity_note: true) have zero observed activity by definition — a profile is not participation.",
+            "Restart cycles (e.g. free-tier spin-down) reset live rate windows and boot-relative metrics; durable counters and watermarks persist in the store.",
             "Single-instance event bus (FRI_EVENT_BUS=%s): SSE fan-out is per-process." % EVENT_BUS_MODE,
             "Snapshot history is capped at %dh (the store retains 7 days)." % MAX_SNAPSHOT_HOURS,
         ],

@@ -12,7 +12,7 @@ import {
 import { filterDids, didIndexStats, type ReputationFilter, type ActivityFilter } from "@/lib/did-filter";
 import { absoluteTime, relativeTime } from "@/lib/format";
 import { useWatchlist } from "@/hooks/useWatchlist";
-import type { DidIndex, DidSortKey, ReputationIndex } from "@/lib/types";
+import type { DidIndex, DidSortKey, DidStats, ReputationIndex } from "@/lib/types";
 
 const SORTS: { id: DidSortKey; label: string }[] = [
   { id: "messages", label: "Messages" },
@@ -55,9 +55,45 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
     return new Map(reputationIndex.dids.map((d) => [d.did, d]));
   }, [reputationIndex]);
 
+  // Server-side full-index search: the published snapshot caps per-DID
+  // detail at the top-500 by volume, so low-volume or registry-only
+  // identities are invisible to a purely client-side filter. Queries of
+  // 4+ chars hit /api/dids?q= which scans EVERY DID ever observed or
+  // registered; shorter queries keep the snappy local filter.
+  const [remote, setRemote] = useState<DidStats[] | null>(null);
+  const [remoteBusy, setRemoteBusy] = useState(false);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 4) {
+      setRemote(null);
+      setRemoteBusy(false);
+      return;
+    }
+    let alive = true;
+    setRemoteBusy(true);
+    const timer = window.setTimeout(() => {
+      fetch(`/api/dids?q=${encodeURIComponent(q)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (alive) setRemote(Array.isArray(data?.dids) ? data.dids : []);
+        })
+        .catch(() => {
+          if (alive) setRemote(null); // offline — fall back to local filter
+        })
+        .finally(() => {
+          if (alive) setRemoteBusy(false);
+        });
+    }, 350);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [query]);
+
+  const sourceDids = remote ?? index.dids;
   const dids = useMemo(
-    () => filterDids(index.dids, { query, sort, reputation: repFilter, activity: actFilter, room: roomFilter ?? undefined }, repMap),
-    [index.dids, query, sort, repFilter, actFilter, roomFilter, repMap],
+    () => filterDids(sourceDids, { query, sort, reputation: repFilter, activity: actFilter, room: roomFilter ?? undefined }, repMap),
+    [sourceDids, query, sort, repFilter, actFilter, roomFilter, repMap],
   );
   const { visible, visibleCount, loadMore, total } = usePagination(dids, PAGE_SIZE);
 
@@ -166,6 +202,14 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
                 aria-label="Search DIDs"
                 className="h-10 w-full rounded border border-border bg-surface pl-10 pr-3 font-mono text-sm text-fg placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40"
               />
+              {remoteBusy && (
+                <span
+                  className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-mono text-[10px] text-faint"
+                  role="status"
+                >
+                  …
+                </span>
+              )}
             </div>
             <FilterRow label="Sort" value={sort} options={SORTS} onChange={setSort} />
             <FilterRow label="Rep" value={repFilter} options={REP_FILTERS} onChange={setRepFilter} />

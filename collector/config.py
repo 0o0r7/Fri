@@ -93,6 +93,59 @@ TIMEOUT = 25.0
 FETCH_DELAY = 0.2
 
 # ---------------------------------------------------------------------------
+# Full-history durability (2026-09 "no DID is forgotten" response)
+#
+# Four separate gates used to lose DIDs: the ~10 MiB room ring churns in
+# hours under flood traffic, only a handful of rooms were long-polled,
+# published snapshots cap at top-500 detail, and every backend restart
+# rebuilt from that truncated baseline. The fixes below make FRI a
+# cumulative, append-only oracle:
+#
+#   backfill   — GET /r/<room>/export returns the whole retained ring in
+#                ONE request; a background sweep ingests every signed
+#                message from the top non-machine rooms at boot and then
+#                periodically, with per-room seq watermarks so no message
+#                is ever counted twice (see backend/backfill.py).
+#   registry   — the /kv/did-* note namespace is PERSISTENT (it survives
+#                ring churn); a sweep indexes every self-published DID
+#                profile, so even a DID whose messages were churned away
+#                before FRI ever saw them stays findable with its bio
+#                (see backend/registry.py).
+#   durability — per-DID stats are written through to the store
+#                (fri:d:<fingerprint>) every persist cycle and re-merged
+#                at boot, so restarts/spin-downs no longer reset the
+#                index to the top-500 baseline.
+# ---------------------------------------------------------------------------
+
+# Rooms selected from /rooms (by activity) for the export backfill sweep,
+# on top of ALWAYS_POLL_ROOMS. mb-* machine boards are excluded: their
+# rings are template-spam factories and would dominate the sweep for zero
+# reputation signal. Live long-polling stays limited to the always-poll
+# set (technocore rate-limits aggressive polling).
+BACKFILL_ROOMS_LIMIT = 60
+
+# Re-run the export sweep this often (seconds) — new messages in
+# unmonitored rooms are picked up here.
+BACKFILL_INTERVAL_S = 6 * 3600
+
+# Polite delay between export fetches (seconds) and export read timeout.
+BACKFILL_ROOM_DELAY_S = 1.0
+BACKFILL_TIMEOUT_S = 90.0
+
+# DID-note registry: 256 shards (did-00..did-ff), sweep cadence + polite
+# per-request delay. First sweep is the expensive one (one list + one note
+# read per note); later sweeps only fetch NEW keys.
+REGISTRY_INTERVAL_S = 6 * 3600
+REGISTRY_DELAY_S = 0.25
+REGISTRY_TIMEOUT_S = 20.0
+
+# Durable per-DID persistence: flush cadence (seconds) and key prefix.
+DID_PERSIST_INTERVAL_S = 30.0
+DID_PERSIST_PREFIX = "fri:d:"
+# Per-room seq watermark persistence (prevents cross-boot double counts).
+SEQ_WATERMARK_KEY = "fri:seq:watermarks"
+
+# ---------------------------------------------------------------------------
 # TQR score weights (unchanged from v1)
 # ---------------------------------------------------------------------------
 

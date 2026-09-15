@@ -72,6 +72,10 @@ export type DidStats = {
   phrase_msgs?: number;
   template_msgs?: number;
   campaign_msgs?: number;
+  /** Identity-registry fields (API v1.2+) — present when the DID
+   * published a persistent did-note (survives room-ring churn). */
+  profile_bio?: string;
+  identity_note?: boolean;
 };
 
 export type DidIndex = {

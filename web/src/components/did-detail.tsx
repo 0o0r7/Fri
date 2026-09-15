@@ -39,6 +39,11 @@ export function DidDetail({ did }: { did: DidStats }) {
             <h2 className="mt-1 break-all text-base font-mono font-medium tracking-tight text-balance">
               {shortDid(did.did)}
             </h2>
+            {did.identity_note && did.profile_bio ? (
+              <p className="mt-2 max-w-prose border-l-2 border-accent/40 pl-2 text-sm text-muted">
+                {did.profile_bio}
+              </p>
+            ) : null}
           </div>
           <span className="inline-flex shrink-0 min-w-16 items-center justify-end rounded-full bg-good-dim px-2.5 py-1 font-mono text-sm text-good tabular-nums">
             {did.messages_signed}
