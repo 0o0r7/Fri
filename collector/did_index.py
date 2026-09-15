@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from .config import MACHINE_ROOMS
 from .spam import (
@@ -292,6 +292,14 @@ class DidIndex:
 
     def get(self, did: str) -> Optional[DidStats]:
         return self._dids.get(did)
+
+    def dids(self) -> Iterable[str]:
+        """Every tracked DID string (registry reconciliation, audits)."""
+        return self._dids.keys()
+
+    def mark_dirty_many(self, dids) -> None:
+        """Re-queue DIDs after a failed persistence flush (no silent loss)."""
+        self._dirty.update(dids)
 
     def top_dids(self, limit: int = 100, *, by: str = "messages_signed") -> List[DidStats]:
         """Return the top-N DIDs sorted by `by` ('messages_signed' or 'rooms_active_in')."""

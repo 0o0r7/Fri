@@ -245,7 +245,22 @@ class CollectorLoop:
 
     @staticmethod
     def _durable_entry(stats: DidStats) -> dict[str, Any]:
-        """Compact store shape for one DID (published view minus derived)."""
+        """Compact store shape for one DID (published view minus derived).
+
+        Identity-only DIDs (zero observed messages) persist a slim entry:
+        the zero counters and empty rooms map carry no information, and
+        with tens of thousands of registry entries every saved byte is
+        store headroom (eviction is the failure mode being defended
+        against). hydrate_entry treats missing fields as defaults, so the
+        slim shape round-trips losslessly.
+        """
+        if stats.messages_signed == 0 and not stats.rooms and stats.identity_note:
+            return {
+                "did": stats.did,
+                "first_seen": stats.first_seen,
+                "profile_bio": stats.profile_bio,
+                "identity_note": True,
+            }
         return {
             "did": stats.did,
             "messages_signed": stats.messages_signed,
@@ -285,8 +300,14 @@ class CollectorLoop:
                 mapping[f"{DID_PERSIST_PREFIX}{fp}"] = json.dumps(
                     self._durable_entry(stats), separators=(",", ":")
                 )
-            if mapping:
-                await self.store.mset_raw(mapping)
+            try:
+                if mapping:
+                    await self.store.mset_raw(mapping)
+            except Exception:
+                # pop_dirty() already cleared the set — re-queue so the
+                # next cycle retries instead of silently losing writes.
+                self.did_index.mark_dirty_many(dirty)
+                raise
         await persist_watermarks(self)
 
     # ------------------------------------------------------------------

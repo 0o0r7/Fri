@@ -400,7 +400,12 @@ async def meta():
                 "when all their messages churned out of every ring before "
                 "they were ever sampled. Identity notes are "
                 "self-published (identity_note: true) and carry no "
-                "activity counters until real signed messages are seen."
+                "activity counters until real signed messages are seen. "
+                "The registry sweep also self-heals: every pass re-fetches "
+                "any did-note whose entry went missing from the durable "
+                "store (eviction, flush, data loss), so the index "
+                "converges back to the full persistent ledger instead of "
+                "permanently forgetting what the store dropped."
             ),
             "hydration_overlap": (
                 "On boot the collector re-hydrates from the committed "

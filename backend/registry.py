@@ -18,6 +18,13 @@ Known-note tracking lives in the store as a fingerprint set
 request per shard (256) + one note read per new fingerprint. Sweeps run
 at boot and every REGISTRY_INTERVAL_S, politely (REGISTRY_DELAY_S between
 requests), and abort cleanly on rate limits — the next sweep resumes.
+
+Self-healing reconciliation (2026-09-15): a fingerprint whose durable
+entry went missing (store eviction, flush, boot data loss) is re-fetched
+and re-registered on every sweep until it persists again — the note
+namespace is the source of truth, so the index always converges back to
+the full ledger. Junk notes (non-DID bodies) are parked separately
+(REGISTRY_JUNK_KEY) so they are read exactly once, never re-fetched.
 """
 
 from __future__ import annotations
@@ -45,6 +52,7 @@ except ImportError:  # pragma: no cover — backend always has collector/
 log = logging.getLogger("fri.registry")
 
 REGISTRY_KNOWN_KEY = "fri:reg:known"
+REGISTRY_JUNK_KEY = "fri:reg:junk"
 SHARD_COUNT = 256  # did-00 .. did-ff — fingerprint hex prefixes
 
 
@@ -93,14 +101,44 @@ async def _get(collector, path: str) -> httpx.Response | None:
 
 
 async def sweep_once(collector) -> dict[str, int]:
-    """Walk every shard, register unseen did-notes. Never raises."""
-    totals = {"shards": 0, "notes": 0, "registered": 0, "failed_shards": 0}
+    """Walk every shard, register unseen did-notes. Never raises.
+
+    Reconciliation: a fingerprint already in the known set is skipped
+    only when its entry still exists in the live index. Known-but-missing
+    fingerprints (durable-store eviction, flush, boot data loss) are
+    re-fetched and re-registered — the note namespace is persistent, so
+    the index converges back to the full ledger within one sweep.
+    """
+    totals = {
+        "shards": 0,
+        "notes": 0,
+        "registered": 0,
+        "failed_shards": 0,
+        "healed": 0,
+    }
     known: set[str] = set()
+    junk: set[str] = set()
     try:
         known = await collector.store.smembers(REGISTRY_KNOWN_KEY)
     except Exception:
         known = set()
+    try:
+        junk = await collector.store.smembers(REGISTRY_JUNK_KEY)
+    except Exception:
+        junk = set()
+
+    # Fingerprints currently tracked by the live index. A known fingerprint
+    # absent from here is a lost entry — it must be re-fetched, not skipped.
+    index_fps: set[str] = set()
+    try:
+        index_fps = {
+            did_note_fingerprint(d) for d in collector.did_index.dids()
+        }
+    except Exception:
+        index_fps = set()  # worst case: re-fetch everything known, politely
+    missing = known - index_fps - junk
     new_fps: list[str] = []
+    new_junk: list[str] = []
 
     for shard_idx in range(SHARD_COUNT):
         shard = f"did-{shard_idx:02x}"
@@ -121,7 +159,9 @@ async def sweep_once(collector) -> dict[str, int]:
             if not key:
                 continue
             fp = f"{shard[4:]}{key}"  # shard suffix + key = full fingerprint
-            if fp in known:
+            if fp in junk:
+                continue  # parked junk — read exactly once, ever
+            if fp in known and fp not in missing:
                 continue
             note = await _get(collector, f"/kv/{shard}/{key}")
             await asyncio.sleep(REGISTRY_DELAY_S)
@@ -129,37 +169,48 @@ async def sweep_once(collector) -> dict[str, int]:
                 continue
             parsed = parse_note_value(note.text)
             if parsed is None:
-                # Junk in the namespace — remember the fingerprint so we
-                # never re-read it, but register nothing.
-                new_fps.append(fp)
+                # Junk in the namespace — park it forever so we never
+                # re-read it, but register nothing.
+                new_junk.append(fp)
                 continue
             did, bio = parsed
-            created = collector.did_index.register_identity(did, bio or None)
+            existed = collector.did_index.get(did) is not None
+            collector.did_index.register_identity(did, bio or None)
             totals["notes"] += 1
-            if created:
+            if not existed:
                 totals["registered"] += 1
+            if fp in known:
+                totals["healed"] += 1
             new_fps.append(fp)
         # Flush progress incrementally: free-tier spin-downs can kill the
         # sweep mid-flight, and re-fetching every note from scratch on
         # every boot would make the first full pass never finish.
-        if len(new_fps) >= 200:
+        if len(new_fps) >= 200 or len(new_junk) >= 200:
             try:
-                await collector.store.sadd(REGISTRY_KNOWN_KEY, new_fps)
-                new_fps = []
+                if new_fps:
+                    await collector.store.sadd(REGISTRY_KNOWN_KEY, new_fps)
+                    new_fps = []
+                if new_junk:
+                    await collector.store.sadd(REGISTRY_JUNK_KEY, new_junk)
+                    new_junk = []
             except Exception as e:
                 log.warning("registry known-set flush failed: %s", e)
         await asyncio.sleep(REGISTRY_DELAY_S)
         if shard_idx % 32 == 31:
             log.info(
-                "registry sweep %d/256 shards: %d notes (%d new)",
+                "registry sweep %d/256 shards: %d notes (%d new, %d healed)",
                 shard_idx + 1,
                 totals["notes"],
                 totals["registered"],
+                totals["healed"],
             )
 
-    if new_fps:
+    if new_fps or new_junk:
         try:
-            await collector.store.sadd(REGISTRY_KNOWN_KEY, new_fps)
+            if new_fps:
+                await collector.store.sadd(REGISTRY_KNOWN_KEY, new_fps)
+            if new_junk:
+                await collector.store.sadd(REGISTRY_JUNK_KEY, new_junk)
         except Exception as e:
             log.warning("registry known-set persist failed: %s", e)
     return totals

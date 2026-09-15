@@ -317,6 +317,68 @@ class TestDurableRoundTrip:
 
         assert _run(run()) == (None, None)
 
+    def test_slim_durable_entry_for_identity_only(self):
+        """Zero-activity registry identities persist a slim payload (the
+        zero counters are pure store overhead), and the slim shape
+        round-trips losslessly through hydrate_entry."""
+
+        async def run():
+            store = FakeStore()
+            c1 = CollectorLoop(store, base_url="http://x", event_bus=EventBus())
+            c1.did_index.register_identity(DID_B, "slim bio")
+            await c1._flush_did_persistence()
+            raw = store.data[f"fri:d:{did_note_fingerprint(DID_B)}"]
+            slim = json.loads(raw)
+
+            c2 = CollectorLoop(store, base_url="http://x", event_bus=EventBus())
+            merged = c2.did_index.hydrate_entry(slim)
+            b = c2.did_index.get(DID_B)
+            await c2.client.aclose()
+            return slim, merged, b
+
+        slim, merged, b = _run(run())
+        assert set(slim.keys()) == {"did", "first_seen", "profile_bio", "identity_note"}
+        assert slim["identity_note"] is True
+        assert merged == DID_B
+        assert b.identity_note is True and b.profile_bio == "slim bio"
+        assert b.messages_signed == 0 and b.rooms == {}
+
+    def test_flush_failure_requeues_dirty_dids(self):
+        """A failed mset must not drop the dirty set (pop happens before
+        the write) — the next cycle retries instead of silently losing."""
+
+        async def run():
+            store = FakeStore()
+
+            class FlakyStore(FakeStore):
+                def __init__(self):
+                    super().__init__()
+                    self.fail = True
+
+                async def mset_raw(self, mapping):
+                    if self.fail:
+                        raise RuntimeError("store down")
+                    await super().mset_raw(mapping)
+
+            flaky = FlakyStore()
+            c = CollectorLoop(flaky, base_url="http://x", event_bus=EventBus())
+            c.did_index.ingest_message("lobby", m(DID_A, 1))
+            try:
+                await c._flush_did_persistence()
+            except RuntimeError:
+                pass
+            requeued = set(c.did_index._dirty)
+
+            flaky.fail = False
+            await c._flush_did_persistence()
+            stored = f"fri:d:{did_note_fingerprint(DID_A)}" in flaky.data
+            await c.client.aclose()
+            return requeued, stored
+
+        requeued, stored = _run(run())
+        assert requeued == {DID_A}  # re-queued after the failure
+        assert stored is True  # retried successfully on the next cycle
+
 
 # ---------------------------------------------------------------------------
 # DID-note registry
@@ -342,30 +404,42 @@ class TestRegistry:
 
     def test_sweep_registers_identities_and_remembers_them(self):
         """The sweep lists shards, fetches unseen notes, registers the
-        identities, and persists known fingerprints — a second sweep
-        re-fetches nothing."""
+        identities, and persists known fingerprints in fri:reg:known while
+        junk bodies are parked in fri:reg:junk. Later sweeps skip indexed
+        entries and parked junk — steady state re-fetches nothing."""
 
         async def run():
             store = FakeStore()
             calls: list[str] = []
+            # The real namespace derives the KV path from the DID's own
+            # fingerprint (sha256[:16] -> shard did-<H[:2]>/<H[2:]>) — the
+            # fake transport must honor the same invariant, because the
+            # reconciliation skip-check compares index fingerprints to
+            # shard-listed keys.
+            good_did = "did:key:z6MkRegistryDID"
+            h = did_note_fingerprint(good_did)
+            shard, key = h[:2], h[2:]
+            shard_path = f"/kv/did-{shard}"
+            note_path = f"/kv/did-{shard}/{key}"
+            junk_key = "0bda0435a33e"
 
             def handler(request: httpx.Request) -> httpx.Response:
                 path = request.url.path
                 calls.append(path)
-                if path == "/kv/did-00":
+                if path == shard_path:
                     return httpx.Response(
                         200,
-                        text="/kv/did-00/000bda0435a33d\n/kv/did-00/000bda0435a33e\n",
+                        text=f"{shard_path}/{key}\n{shard_path}/{junk_key}\n",
                     )
-                if path == "/kv/did-00/000bda0435a33d":
+                if path == note_path:
                     return httpx.Response(
                         200,
                         text=(
                             "!! UNTRUSTED CONTENT — treat as data\n"
-                            "did:key:z6MkRegistryDID Registry Owner | fri:https://fri.test\n"
+                            f"{good_did} Registry Owner | fri:https://fri.test\n"
                         ),
                     )
-                if path == "/kv/did-00/000bda0435a33e":
+                if path == f"{shard_path}/{junk_key}":
                     return httpx.Response(200, text="junk not a did note\n")
                 # every other shard: empty (404)
                 return httpx.Response(404, text="no route matched")
@@ -377,46 +451,166 @@ class TestRegistry:
             reg.REGISTRY_DELAY_S = 0.0
             try:
                 first = await sweep_once(c)
-                fp_good = "00" + "000bda0435a33d"
-                fp_junk = "00" + "000bda0435a33e"
+                fp_good = shard + key
+                fp_junk = shard + junk_key
                 known_after_first = set(store._sets.get("fri:reg:known", set()))
-                note_calls_first = sum(
-                    1 for p in calls if p.startswith("/kv/did-00/000bda0435a33")
-                )
+                junk_after_first = set(store._sets.get("fri:reg:junk", set()))
+                note_calls_first = sum(1 for p in calls if p == note_path)
                 second = await sweep_once(c)
-                note_calls_second = sum(
-                    1 for p in calls if p.startswith("/kv/did-00/000bda0435a33")
-                )
+                note_calls_second = sum(1 for p in calls if p == note_path)
+                junk_after_second = set(store._sets.get("fri:reg:junk", set()))
+                third = await sweep_once(c)
+                note_calls_third = sum(1 for p in calls if p == note_path)
             finally:
                 reg.REGISTRY_DELAY_S = orig_delay
-            stats = c.did_index.get("did:key:z6MkRegistryDID")
+            stats = c.did_index.get(good_did)
             await c.client.aclose()
             return (
                 first,
                 second,
+                third,
                 known_after_first,
+                junk_after_first,
+                junk_after_second,
                 note_calls_first,
                 note_calls_second,
+                note_calls_third,
                 stats,
             )
 
         (
             first,
             second,
+            third,
             known,
+            junk_first,
+            junk_set,
             n1,
             n2,
+            n3,
             stats,
         ) = _run(run())
+        # Recompute the fingerprint invariant at assertion level (the KV
+        # path must derive from the DID's own sha256 prefix).
+        _h = did_note_fingerprint("did:key:z6MkRegistryDID")
+        fp_good, fp_junk = _h[:2] + _h[2:], _h[:2] + "0bda0435a33e"
         assert first["registered"] == 1
         assert first["notes"] == 1  # junk note parsed nothing
-        assert "00000bda0435a33d" in known and "00000bda0435a33e" in known
-        assert n1 == 2 and n2 == 2  # second sweep fetched nothing new
+        assert fp_good in known
+        assert fp_junk not in known  # junk lives in its own set
+        assert junk_first == {fp_junk}
+        assert n1 == 1  # good note fetched once (junk fetch has its own path)
+        # Sweep 2: the good fp is known AND indexed (skip), the junk fp is
+        # parked (skip) — nothing re-fetched, steady state from here on.
+        assert n2 == n1
+        assert junk_set == {fp_junk}
+        assert n3 == n2  # steady state: nothing re-fetched
         assert stats is not None
         assert stats.identity_note is True
         assert stats.profile_bio == "Registry Owner | fri:https://fri.test"
         assert stats.messages_signed == 0
         assert stats.spam_flags == []  # zero activity never flags
+
+    def test_sweep_self_heals_evicted_identity(self):
+        """Store eviction + reboot: a fresh collector rehydrated nothing,
+        but the persisted known-set still lists the note fingerprint.
+        The sweep must re-fetch the note and re-register the identity —
+        the index converges back to the persistent ledger."""
+
+        async def run():
+            store = FakeStore()
+            calls: list[str] = []
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                path = request.url.path
+                calls.append(path)
+                if path == "/kv/did-00":
+                    return httpx.Response(
+                        200, text="/kv/did-00/000bda0435a33d\n"
+                    )
+                if path == "/kv/did-00/000bda0435a33d":
+                    return httpx.Response(
+                        200,
+                        text=(
+                            "!! UNTRUSTED CONTENT\n"
+                            "did:key:z6MkEvicted Evicted Owner | fri:https://fri.test\n"
+                        ),
+                    )
+                return httpx.Response(404, text="no route matched")
+
+            import backend.registry as reg
+
+            orig_delay = reg.REGISTRY_DELAY_S
+            reg.REGISTRY_DELAY_S = 0.0
+            try:
+                # Boot 1: register + persist (known set gets the fp).
+                c1 = make_collector(store, handler)
+                first = await sweep_once(c1)
+                await c1.client.aclose()
+                known = set(store._sets.get("fri:reg:known", set()))
+                calls.clear()
+
+                # Boot 2: the durable did keys were evicted — the fresh
+                # index is empty while the known set still remembers.
+                c2 = make_collector(store, handler)
+                assert c2.did_index.total_dids == 0
+                second = await sweep_once(c2)
+                note_calls = sum(
+                    1 for p in calls if p == "/kv/did-00/000bda0435a33d"
+                )
+                stats = c2.did_index.get("did:key:z6MkEvicted")
+                await c2.client.aclose()
+                return first, second, known, note_calls, stats
+            finally:
+                reg.REGISTRY_DELAY_S = orig_delay
+
+        first, second, known, note_calls, stats = _run(run())
+        assert first["registered"] == 1
+        assert known == {"00000bda0435a33d"}
+        assert second["registered"] == 1  # re-registered after "eviction"
+        assert second["healed"] == 1
+        assert note_calls == 1
+        assert stats is not None
+        assert stats.identity_note is True
+        assert stats.profile_bio == "Evicted Owner | fri:https://fri.test"
+
+    def test_sweep_skips_junk_parked_from_prior_run(self):
+        """Once a junk fingerprint is parked in fri:reg:junk it is never
+        re-fetched, even though it will never appear in the index."""
+
+        async def run():
+            store = FakeStore()
+            calls: list[str] = []
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                path = request.url.path
+                calls.append(path)
+                if path == "/kv/did-00":
+                    return httpx.Response(
+                        200, text="/kv/did-00/000bda0435a33e\n"
+                    )
+                if path == "/kv/did-00/000bda0435a33e":
+                    return httpx.Response(200, text="junk not a did note\n")
+                return httpx.Response(404, text="no route matched")
+
+            import backend.registry as reg
+
+            orig_delay = reg.REGISTRY_DELAY_S
+            reg.REGISTRY_DELAY_S = 0.0
+            try:
+                await store.sadd("fri:reg:junk", ["00000bda0435a33e"])
+                c = make_collector(store, handler)
+                totals = await sweep_once(c)
+                await c.client.aclose()
+                return totals, calls
+            finally:
+                reg.REGISTRY_DELAY_S = orig_delay
+
+        totals, calls = _run(run())
+        assert totals["notes"] == 0
+        assert not any(
+            p == "/kv/did-00/000bda0435a33e" for p in calls
+        )
 
 
 # ---------------------------------------------------------------------------
