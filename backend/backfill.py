@@ -52,6 +52,10 @@ from collector.config import (
 
 log = logging.getLogger("fri.backfill")
 
+# Lines per streaming ingest batch — bounds peak memory to one batch of
+# parsed records instead of a whole room ring.
+BACKFILL_STREAM_BATCH = 2000
+
 
 def parse_watermarks(payload: dict[str, Any] | None) -> dict[str, dict[str, int]]:
     """Validate a persisted watermark payload ({room: {lo, hi}})."""
@@ -100,24 +104,24 @@ def select_rooms(room_metas: dict[str, dict[str, Any]]) -> list[str]:
     return rooms
 
 
-def ingest_ring(
+def ingest_ring_frozen(
     collector,
     room: str,
     lines: list[str],
+    lo_start: int | None,
+    hi_start: int | None,
 ) -> tuple[int, int, int]:
-    """Ingest export JSONL lines into the collector indices.
+    """Ingest export JSONL lines against FROZEN watermarks.
 
-    Returns (ingested, skipped_seen, malformed). The room's watermarks
-    are FROZEN at sweep start: exports arrive oldest-first, and each
-    ingest lowers the floor — comparing against a moving floor would
-    re-skip everything above the first ingested record. Freezing is
-    race-free too: this function is fully synchronous, so the poll loop
-    cannot interleave mid-sweep, and the live paths re-check their own
-    high-water mark on every _ingest anyway.
+    The room's watermarks are captured ONCE per export (before the first
+    line is ingested) and passed in explicitly, so a streaming sweep that
+    ingests in batches keeps the exact contract of a single-shot ingest:
+    exports arrive oldest-first, and comparing against a floor that moved
+    mid-file would re-skip everything above the first ingested record.
+    Fully synchronous — the poll loop cannot interleave mid-batch, and
+    the live paths re-check their own high-water mark on every _ingest.
     """
     monitored = room in collector.monitored
-    lo_start = collector._seq_lo.get(room)
-    hi_start = collector._seq_hi.get(room)
     ingested = skipped = malformed = 0
     for line in lines:
         line = line.strip()
@@ -159,29 +163,74 @@ def ingest_ring(
     return ingested, skipped, malformed
 
 
+def ingest_ring(
+    collector,
+    room: str,
+    lines: list[str],
+) -> tuple[int, int, int]:
+    """Ingest a whole export at once (watermarks frozen at call start)."""
+    return ingest_ring_frozen(
+        collector,
+        room,
+        lines,
+        collector._seq_lo.get(room),
+        collector._seq_hi.get(room),
+    )
+
+
 async def sweep_once(collector, rooms: list[str]) -> dict[str, int]:
-    """One export sweep over the given rooms. Never raises."""
+    """One export sweep over the given rooms. Never raises.
+
+    Streams each export line-by-line in bounded batches instead of
+    materializing the whole ring (up to ~10MB text + a ~150k-element
+    line list per big room) — the transient spike that OOM-killed the
+    512MB Render instance during sweeps (2026-09-15 incident).
+    """
     totals = {"rooms_ok": 0, "rooms_failed": 0, "ingested": 0, "skipped": 0}
     for room in rooms:
         try:
-            resp = await collector.client.get(
-                f"/r/{room}/export",
-                timeout=httpx.Timeout(BACKFILL_TIMEOUT_S, connect=10.0),
-            )
-            if resp.status_code == 429:
-                # Rate limited — sit one out, then retry once before
-                # deferring the room to the next sweep.
-                await asyncio.sleep(10.0)
-                resp = await collector.client.get(
+            ingested = skipped = malformed = 0
+            # Frozen before the first byte is consumed — the streaming
+            # batches must see exactly the window a single-shot ingest saw.
+            lo_start = collector._seq_lo.get(room)
+            hi_start = collector._seq_hi.get(room)
+            batch: list[str] = []
+            completed = False
+            for attempt in range(2):
+                batch = []
+                async with collector.client.stream(
+                    "GET",
                     f"/r/{room}/export",
                     timeout=httpx.Timeout(BACKFILL_TIMEOUT_S, connect=10.0),
+                ) as resp:
+                    if resp.status_code == 429 and attempt == 0:
+                        # Rate limited — sit one out, then retry once.
+                        await asyncio.sleep(10.0)
+                        continue
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        batch.append(line)
+                        if len(batch) >= BACKFILL_STREAM_BATCH:
+                            i, s, m = ingest_ring_frozen(
+                                collector, room, batch, lo_start, hi_start
+                            )
+                            ingested += i
+                            skipped += s
+                            malformed += m
+                            batch = []
+                    completed = True
+                    break
+            if completed and batch:
+                i, s, m = ingest_ring_frozen(
+                    collector, room, batch, lo_start, hi_start
                 )
-            resp.raise_for_status()
-            lines = resp.text.splitlines()
-            ingested, skipped, malformed = ingest_ring(collector, room, lines)
-            totals["rooms_ok"] += 1
+                ingested += i
+                skipped += s
+                malformed += m
+            totals["rooms_ok"] += 1 if completed else 0
             totals["ingested"] += ingested
             totals["skipped"] += skipped
+            totals["malformed"] = totals.get("malformed", 0) + malformed
             if ingested or malformed:
                 log.info(
                     "backfill %s: +%d msgs (%d already indexed, %d malformed)",

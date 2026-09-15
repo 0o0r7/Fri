@@ -76,7 +76,7 @@ def _ts_minute(ts: str) -> Optional[int]:
         return None
 
 
-@dataclass
+@dataclass(slots=True)
 class DidStats:
     """Accumulator for one DID's activity across all sampled rooms.
 
@@ -85,6 +85,10 @@ class DidStats:
     counters below sum to the total low-signal count without double
     subtraction. Rate buckets hold per-minute message counts from
     non-machine rooms only, pruned to a rolling 10-minute window.
+
+    slots=True: tens of thousands of these instances stay resident —
+    slots cut per-instance memory roughly in half and were part of the
+    Render OOM response (2026-09-15 incident).
     """
 
     did: str

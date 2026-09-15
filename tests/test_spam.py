@@ -136,8 +136,26 @@ def test_evaluator_key_memory_is_bounded():
     did = "did:key:z6MkA"
     for i in range(200):
         ev.observe("lobby", did, f"unique message number {i} about widget {i % 9} design")
-    assert len(ev._recent_keys[did]) <= ev._key_cap
-    assert len(ev._recent_key_set[did]) <= ev._key_cap
+    hist, counts = ev._recent[did]
+    assert len(hist) <= ev._key_cap
+    assert len(counts) <= ev._key_cap
+
+
+def test_evaluator_did_tracking_is_lru_capped():
+    """Per-DID state must not grow with the network size — the unbounded
+    dict OOM-killed the Render instance. Beyond the cap, the least
+    recently active DID is evicted (graceful classifier degradation)."""
+    ev = DidSpamEvaluator()
+    for i in range(20000):
+        did = f"did:key:z6MkFiller{i:06d}"
+        ev.observe("lobby", did, f"distinct filler message body number {i}")
+    assert len(ev._recent) <= 16384 + 1  # cap (+1 while inserting)
+    # The very first filler was evicted; a fresh DID survives.
+    assert f"did:key:z6MkFiller000000" not in ev._recent
+    assert f"did:key:z6MkFiller019999" in ev._recent
+    # Re-activating an old DID re-inserts it cleanly (no stale duplicate).
+    ev._remember("did:key:z6MkFiller000000", "some/key")
+    assert "did:key:z6MkFiller000000" in ev._recent
 
 
 def test_compute_flags_phrase_spam():

@@ -143,6 +143,14 @@ NEW_DID_MIN_MESSAGES = 300
 # CampaignTracker bounds (memory safety under firehose load).
 CAMPAIGN_MAX_ENTRIES = 4096
 CAMPAIGN_MAX_DIDS_PER_KEY = 32
+# Per-DID recent-template state (did -> deque+Counter) is the process's
+# largest unbounded structure: ~2KB per tracked DID. Every DID that ever
+# posted one ≥12-char message creates an entry and the network has tens
+# of thousands — uncapped, this alone OOM-killed the 512MB Render
+# instance (2026-09-15 incident). Cap it LRU-style: recently active DIDs
+# keep their repetition history, evicted ones only lose template-repeat
+# detection (persisted counters/flags are unaffected).
+SPAM_MAX_TRACKED_DIDS = 16384
 
 # Message categories — exactly one per message, so per-DID counters sum to
 # the total low-signal count without double-subtraction.
@@ -242,8 +250,10 @@ class DidSpamEvaluator:
 
     def __init__(self, campaign_tracker: Optional[CampaignTracker] = None) -> None:
         self.campaigns = campaign_tracker or CampaignTracker()
-        self._recent_keys: Dict[str, deque] = {}  # did -> bounded key history
-        self._recent_key_set: Dict[str, Counter] = {}  # did -> key -> count
+        # did -> [bounded key history, key -> count], LRU-ordered — one
+        # OrderedDict entry per tracked DID instead of two parallel dicts,
+        # so the whole structure can be capped (SPAM_MAX_TRACKED_DIDS).
+        self._recent: "OrderedDict[str, List[Any]]" = OrderedDict()
         self._key_cap = 32
 
     def observe(self, room: str, did: str, text: str) -> SpamVerdict:
@@ -268,7 +278,7 @@ class DidSpamEvaluator:
             return SpamVerdict(category=CATEGORY_CAMPAIGN, template_key=key)
 
         # Repetition of this DID's own earlier templates.
-        if self._recent_key_set.get(did, {}).get(key, 0) > 0:
+        if did in self._recent and key in self._recent[did][1]:
             self._remember(did, key)
             return SpamVerdict(category=CATEGORY_TEMPLATE, template_key=key)
 
@@ -281,14 +291,16 @@ class DidSpamEvaluator:
         return SpamVerdict(category=CATEGORY_CLEAN, template_key=key)
 
     def _remember(self, did: str, key: str) -> None:
-        """Track the DID's recent template keys (bounded, hash-backed)."""
-        hist = self._recent_keys.get(did)
-        counts = self._recent_key_set.get(did)
-        if hist is None:
-            hist = deque(maxlen=self._key_cap)
-            counts = Counter()
-            self._recent_keys[did] = hist
-            self._recent_key_set[did] = counts
+        """Track the DID's recent template keys (bounded, LRU-capped)."""
+        entry = self._recent.get(did)
+        if entry is None:
+            entry = [deque(maxlen=self._key_cap), Counter()]
+            self._recent[did] = entry
+            if len(self._recent) > SPAM_MAX_TRACKED_DIDS:
+                self._recent.popitem(last=False)  # evict least-recently-active
+        else:
+            self._recent.move_to_end(did)
+        hist, counts = entry
         if len(hist) == hist.maxlen and hist.maxlen:
             oldest = hist.popleft()
             counts[oldest] -= 1
@@ -299,8 +311,7 @@ class DidSpamEvaluator:
 
     def forget(self, did: str) -> None:
         """Drop a DID's per-DID state (hydration replaces entries)."""
-        self._recent_keys.pop(did, None)
-        self._recent_key_set.pop(did, None)
+        self._recent.pop(did, None)
 
 
 def compute_flags(

@@ -137,6 +137,60 @@ class TestBackfillExactOnce:
         assert malformed == 0
         assert after == before + 10  # exact-once, no overlap inflation
 
+    def test_streaming_sweep_matches_single_shot_and_never_double_counts(self):
+        """The streaming sweep ingests in bounded batches — the frozen
+        watermark contract must hold across batch boundaries exactly as
+        for a single-shot ingest, including a mid-file connection drop
+        followed by a retry (already-ingested records are re-skipped)."""
+
+        async def run():
+            store = FakeStore()
+            export = [
+                json.dumps(m(DID_A if seq % 2 else DID_B, seq))
+                for seq in range(100, 5000)
+            ]
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                return httpx.Response(200, text="\n".join(export) + "\n")
+
+            import backend.backfill as bf
+
+            c = make_collector(store, handler)
+            # Live already owns the tail 4900-4999 (monitored room).
+            for seq in range(4900, 5000):
+                c._ingest("lobby", m(DID_A, seq))
+            c._seq_lo["lobby"] = 4900
+            c._seq_hi["lobby"] = 4999
+
+            one_shot = bf.ingest_ring(c, "lobby", list(export))
+            msgs_one_shot = c.did_index.get(DID_A).messages_signed
+            await c.client.aclose()
+
+            # Fresh boot: same export, streamed in batches (cap lowered to
+            # force many batch boundaries inside the file).
+            orig = bf.BACKFILL_STREAM_BATCH
+            bf.BACKFILL_STREAM_BATCH = 700
+            try:
+                c2 = make_collector(store, handler)
+                for seq in range(4900, 5000):
+                    c2._ingest("lobby", m(DID_A, seq))
+                c2._seq_lo["lobby"] = 4900
+                c2._seq_hi["lobby"] = 4999
+                totals = await bf.sweep_once(c2, ["lobby"])
+                msgs_streamed = c2.did_index.get(DID_A).messages_signed
+                lo, hi = c2._seq_lo.get("lobby"), c2._seq_hi.get("lobby")
+                await c2.client.aclose()
+            finally:
+                bf.BACKFILL_STREAM_BATCH = orig
+            return one_shot, totals, msgs_one_shot, msgs_streamed, (lo, hi)
+
+        (ing1, skip1, mal1), totals, m1, m2, (lo, hi) = _run(run())
+        assert (totals["ingested"], totals["skipped"]) == (ing1, skip1)
+        assert mal1 == 0
+        assert m1 == m2  # identical counters — no double count at boundaries
+        assert totals["rooms_ok"] == 1
+        assert lo == 100 and hi == 4999  # watermark ends at the true edges
+
     def test_seed_floor_marks_uningested_top_for_fresh_rooms(self):
         """A fresh seed with no watermark records the window bottom so the
         sweep stops below it — the poll loop owns everything above."""
