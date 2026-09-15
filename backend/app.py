@@ -286,6 +286,24 @@ async def counts():
     return await app.state.store.get("fri:counts") or {}
 
 
+@app.get("/api/debug/sweep")
+async def debug_sweep():
+    """Registry-sweep observability: timing + counters of the last pass.
+
+    Pure counters and timestamps — no DIDs, no bios, no store internals.
+    Useful to confirm the sweep is alive, how far the shard walk got, and
+    whether priority/pinned reconciliation ran (priority_healed > 0).
+    """
+    from backend.registry import LAST_SWEEP
+
+    out = dict(LAST_SWEEP)
+    out["sweep_running"] = (
+        out.get("started_at") is not None
+        and out.get("started_at") != out.get("finished_at")
+    )
+    return out
+
+
 @app.get("/api/rooms")
 async def rooms():
     return await app.state.store.get("fri:rooms") or {"rooms": []}
@@ -405,7 +423,12 @@ async def meta():
                 "any did-note whose entry went missing from the durable "
                 "store (eviction, flush, data loss), so the index "
                 "converges back to the full persistent ledger instead of "
-                "permanently forgetting what the store dropped."
+                "permanently forgetting what the store dropped. "
+                "Operator-pinned identities (the persistent "
+                "fri:reg:priority set, bootstrapped from FRI_PRIORITY_DIDS) "
+                "are reconciled FIRST on every pass, so pinned DIDs come "
+                "back within seconds of a restart even while the full "
+                "1M+-note ledger is still being walked."
             ),
             "hydration_overlap": (
                 "On boot the collector re-hydrates from the committed "

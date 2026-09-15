@@ -1,5 +1,6 @@
 """Configuration and thresholds for FRI collector."""
 
+import os
 from dataclasses import dataclass
 from typing import List
 
@@ -138,6 +139,18 @@ BACKFILL_TIMEOUT_S = 90.0
 REGISTRY_INTERVAL_S = 6 * 3600
 REGISTRY_DELAY_S = 0.25
 REGISTRY_TIMEOUT_S = 20.0
+
+# Operator-pinned DIDs (comma-separated did:key:... values, env
+# FRI_PRIORITY_DIDS). Every registry sweep reconciles these FIRST — before
+# the 256-shard walk — so pinned identities survive durable-store loss
+# without waiting on a multi-day pass over the 1M+-note registry. The
+# parsed fingerprints are bootstrapped into the persistent
+# fri:reg:priority set on every sweep (see backend/registry.py).
+PRIORITY_DIDS = tuple(
+    d.strip()
+    for d in os.environ.get("FRI_PRIORITY_DIDS", "").split(",")
+    if d.strip()
+)
 
 # Durable per-DID persistence: flush cadence (seconds) and key prefix.
 DID_PERSIST_INTERVAL_S = 30.0

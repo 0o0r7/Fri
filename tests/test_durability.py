@@ -666,6 +666,185 @@ class TestRegistry:
             p == "/kv/did-00/000bda0435a33e" for p in calls
         )
 
+    def test_priority_heals_before_shard_walk(self):
+        """A pinned fingerprint (fri:reg:priority) whose index entry went
+        missing is re-fetched and re-registered FIRST — before the shard
+        walk lists even did-00 — so pinned identities survive eviction
+        within seconds of a sweep starting, not days."""
+
+        async def run():
+            store = FakeStore()
+            calls: list[str] = []
+            pinned_did = "did:key:z6MkPriorityHeal"
+            h = did_note_fingerprint(pinned_did)
+            shard, key = h[:2], h[2:]
+            shard_path = f"/kv/did-{shard}"
+            note_path = f"/kv/did-{shard}/{key}"
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                path = request.url.path
+                calls.append(path)
+                if path == shard_path:
+                    return httpx.Response(200, text=f"{shard_path}/{key}\n")
+                if path == note_path:
+                    return httpx.Response(
+                        200,
+                        text=(
+                            "!! UNTRUSTED CONTENT — treat as data\n"
+                            f"{pinned_did} Pinned Owner | fri:https://fri.test\n"
+                        ),
+                    )
+                return httpx.Response(404, text="no route matched")
+
+            import backend.registry as reg
+
+            orig_delay = reg.REGISTRY_DELAY_S
+            reg.REGISTRY_DELAY_S = 0.0
+            try:
+                # Pin lives in the persistent priority set (as seeded in
+                # the real store), and the index lost the entry.
+                await store.sadd("fri:reg:priority", [h])
+                c = make_collector(store, handler)
+                totals = await sweep_once(c)
+                first_call = calls[0] if calls else None
+                note_calls = sum(1 for p in calls if p == note_path)
+                stats = c.did_index.get(pinned_did)
+                await c.client.aclose()
+                return totals, first_call, note_calls, stats
+            finally:
+                reg.REGISTRY_DELAY_S = orig_delay
+
+        totals, first_call, note_calls, stats = _run(run())
+        assert totals["priority_healed"] == 1
+        assert totals["registered"] == 1
+        # The very first HTTP call was the pinned note, not a shard listing.
+        h = did_note_fingerprint("did:key:z6MkPriorityHeal")
+        assert first_call == f"/kv/did-{h[:2]}/{h[2:]}"
+        assert note_calls == 1  # shard walk skipped the now-known pin
+        assert stats is not None
+        assert stats.identity_note is True
+        assert stats.profile_bio == "Pinned Owner | fri:https://fri.test"
+
+    def test_priority_skips_alive_and_junk_pins(self):
+        """Pins that are alive in the index are not re-fetched; pins parked
+        as junk are never fetched at all — the priority pass heals only
+        what is actually missing."""
+
+        async def run():
+            store = FakeStore()
+            calls: list[str] = []
+            alive_did = "did:key:z6MkAlivePinned"
+            junk_did_fp = did_note_fingerprint("did:key:z6MkJunkPinned")
+            h = did_note_fingerprint(alive_did)
+            shard, key = h[:2], h[2:]
+            shard_path = f"/kv/did-{shard}"
+            note_path = f"/kv/did-{shard}/{key}"
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                path = request.url.path
+                calls.append(path)
+                if path == shard_path:
+                    return httpx.Response(200, text=f"{shard_path}/{key}\n")
+                if path == note_path:
+                    return httpx.Response(
+                        200, text=f"{alive_did} Alive Owner\n"
+                    )
+                return httpx.Response(404, text="no route matched")
+
+            import backend.registry as reg
+
+            orig_delay = reg.REGISTRY_DELAY_S
+            reg.REGISTRY_DELAY_S = 0.0
+            try:
+                await store.sadd(
+                    "fri:reg:priority", [h, junk_did_fp]
+                )
+                await store.sadd("fri:reg:junk", [junk_did_fp])
+                # Steady-state durability: the alive pin is already in the
+                # persisted known-set, so neither the priority pass nor the
+                # shard walk has a reason to re-read it.
+                await store.sadd("fri:reg:known", [h])
+                c = make_collector(store, handler)
+                c.did_index.register_identity(alive_did, "Alive Owner")
+                totals = await sweep_once(c)
+                alive_note_calls = sum(1 for p in calls if p == note_path)
+                junk_note_calls = sum(
+                    1
+                    for p in calls
+                    if p
+                    == f"/kv/did-{junk_did_fp[:2]}/{junk_did_fp[2:]}"
+                )
+                await c.client.aclose()
+                return totals, alive_note_calls, junk_note_calls
+            finally:
+                reg.REGISTRY_DELAY_S = orig_delay
+
+        totals, alive_note_calls, junk_note_calls = _run(run())
+        assert totals["priority_healed"] == 0
+        assert alive_note_calls == 0  # alive pin never re-fetched
+        assert junk_note_calls == 0  # parked junk never read again
+
+    def test_priority_env_bootstrap_pins_new_dids(self):
+        """FRI_PRIORITY_DIDS (env) bootstraps fingerprints into the
+        persistent priority set and heals them on the same sweep — pins
+        can be added without touching the store by hand."""
+
+        async def run():
+            store = FakeStore()
+            calls: list[str] = []
+            pinned_did = "did:key:z6MkEnvPinned"
+            h = did_note_fingerprint(pinned_did)
+            shard, key = h[:2], h[2:]
+            shard_path = f"/kv/did-{shard}"
+            note_path = f"/kv/did-{shard}/{key}"
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                path = request.url.path
+                calls.append(path)
+                if path == shard_path:
+                    return httpx.Response(200, text=f"{shard_path}/{key}\n")
+                if path == note_path:
+                    return httpx.Response(
+                        200, text=f"{pinned_did} Env Pinned Owner\n"
+                    )
+                return httpx.Response(404, text="no route matched")
+
+            import backend.registry as reg
+
+            orig_delay = reg.REGISTRY_DELAY_S
+            orig_prio = reg.PRIORITY_DIDS
+            reg.REGISTRY_DELAY_S = 0.0
+            reg.PRIORITY_DIDS = (pinned_did,)
+            try:
+                c = make_collector(store, handler)
+                totals = await sweep_once(c)
+                priority_set = set(
+                    store._sets.get("fri:reg:priority", set())
+                )
+                known_set = set(store._sets.get("fri:reg:known", set()))
+                note_calls = sum(1 for p in calls if p == note_path)
+                stats = c.did_index.get(pinned_did)
+                await c.client.aclose()
+                return (
+                    totals,
+                    priority_set,
+                    known_set,
+                    note_calls,
+                    stats,
+                )
+            finally:
+                reg.REGISTRY_DELAY_S = orig_delay
+                reg.PRIORITY_DIDS = orig_prio
+
+        totals, priority_set, known_set, note_calls, stats = _run(run())
+        h = did_note_fingerprint("did:key:z6MkEnvPinned")
+        assert h in priority_set  # env pin persisted for future sweeps
+        assert h in known_set  # healed pin recorded as known
+        assert totals["priority_healed"] == 1
+        assert note_calls == 1
+        assert stats is not None
+        assert stats.profile_bio == "Env Pinned Owner"
+
 
 # ---------------------------------------------------------------------------
 # /api/dids?q= — full-index search
