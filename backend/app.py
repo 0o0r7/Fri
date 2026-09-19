@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 from starlette.datastructures import MutableHeaders
@@ -229,6 +229,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(CacheHeaderMiddleware)
+
+# Humans landing on the API root get sent to the dashboard UI.
+DASHBOARD_URL = os.environ.get("FRI_DASHBOARD_URL", "https://fri-woad.vercel.app")
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """Redirect browsers from the bare API host to the dashboard."""
+    return RedirectResponse(DASHBOARD_URL, status_code=307)
 
 
 @app.exception_handler(RedisConnectionError)
