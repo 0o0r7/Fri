@@ -1,0 +1,89 @@
+# FRI backend pipeline — build + publish package + best-effort restart
+# مسیر قرارگیری در ریپو: .github/workflows/deploy-backend.yml
+#
+# نحوهٔ کار:
+#   1) با هر push به main روی مسیرهای بک‌اند، fri.zip ساخته و asset در release
+#      `azure-backend-v1.0.0` جایگزین می‌شود (WEBSITE_RUN_FROM_PACKAGE همان‌جا پین است).
+#   2) اگر secretهای KUDU_USER / KUDU_PASS ست باشند، پروسهٔ python سایت kill می‌شود
+#      تا App Service بالا بیاید و سپس سلامت پایش می‌شود. بدون secrets فقط هشدار می‌دهد
+#      و ری‌استارت دستی لازم است (Portal Restart یا scripts/restart-and-verify.sh).
+#
+# نکته: در tenant دانشجویی SP مسدود است؛ این پایپ‌لاین به هیچ Azure secret ای
+#       به‌جز اختیاری Kudu نیاز ندارد.
+
+name: deploy-backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "collector/**"
+      - "requirements.txt"
+      - "backend/requirements.txt"
+      - "data/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build fri.zip
+        run: |
+          pip install --target vendor -r requirements.txt -r backend/requirements.txt -q
+          zip -qr fri.zip . \
+            -x ".git/*" ".github/*" "web/*" "docs/*" "tests/*" "scripts/*" \
+               "flopkit-sdk-docs/*" "*.pyc" "__pycache__/*"
+          sha256sum fri.zip
+
+      - name: Publish to release azure-backend-v1.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload azure-backend-v1.0.0 fri.zip --clobber --repo "${{ github.repository }}" \
+            || gh release create azure-backend-v1.0.0 fri.zip \
+                 --repo "${{ github.repository }}" \
+                 --title "azure-backend-v1.0.0" \
+                 --notes "Auto-built from ${{ github.sha }}"
+
+  restart-app:
+    runs-on: ubuntu-latest
+    needs: build-and-publish
+    steps:
+      - name: Kill worker via Kudu (best-effort)
+        env:
+          KUDU_USER: ${{ secrets.KUDU_USER }}
+          KUDU_PASS: ${{ secrets.KUDU_PASS }}
+          SITE: fri-tclk-2026
+        run: |
+          if [ -z "$KUDU_USER" ]; then
+            echo "⚠ secrets KUDU_USER/KUDU_PASS ست نیستند — ری‌استارت دستی لازم است."
+            exit 0
+          fi
+          PIDS=$(curl -su "$KUDU_USER:$KUDU_PASS" \
+              "https://$SITE.scm.azurewebsites.net/api/processes" \
+            | python3 -c "import sys,json; procs=json.load(sys.stdin); print(' '.join(str(p['id']) for p in procs if p.get('name') in ('python','python3','w3wp') or 'backend' in str(p.get('command_line',''))))" || true)
+          echo "worker pids: ${PIDS:-none}"
+          for pid in ${PIDS:-}; do
+            curl -su "$KUDU_USER:$KUDU_PASS" -X DELETE \
+              "https://$SITE.scm.azurewebsites.net/api/processes/$pid" || true
+          done
+
+      - name: Wait for /api/health = 200 (تا 15 دقیقه)
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 \
+              https://fri-tclk-2026.azurewebsites.net/api/health || echo 000)
+            [ "$code" = "200" ] && { echo "HEALTH 200 بعد از ~$((i*15))s"; exit 0; }
+            sleep 15
+          done
+          echo "بعد از 15 دقیقه 200 نشد — لاگ را بررسی کن."; exit 1
