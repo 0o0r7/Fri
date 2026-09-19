@@ -43,6 +43,9 @@ class Store:
             decode_responses=True,
             socket_keepalive=True,
             socket_connect_timeout=10,
+            # Hard cap per-command read wait: without it a black-holed pooled
+            # connection (SNAT/LB silent drop) blocks the await forever.
+            socket_timeout=15,
             health_check_interval=30,
         )
         # Retry transient connection errors (Upstash closes idle connections)

@@ -134,10 +134,21 @@ class CollectorLoop:
         # 1. Seed Redis from committed JSON so frontend has data immediately
         await self._seed_from_committed()
 
-        # 1b. Durable layer: merge the persisted full DID index + per-room
-        # seq watermarks BEFORE any live seeding, so the exact-once
-        # contract holds across boots (see backend/backfill.py).
-        await self._rehydrate_durable()
+        # 1b. Durable layer: room watermarks FIRST — a single fast GET that
+        # polling must respect before any live seeding. The heavy per-DID
+        # SCAN+MGET (250k+ fri:d: keys on Aiven, minutes of round-trips)
+        # runs as a background task: awaiting it on the boot path blows
+        # App Service's ~230s startup probe and crash-loops the container.
+        try:
+            wm = parse_watermarks(await self.store.get(SEQ_WATERMARK_KEY))
+        except Exception:
+            wm = {}
+        for room, marks in wm.items():
+            self._seq_lo[room] = marks["lo"]
+            self._seq_hi[room] = marks["hi"]
+        self._rehydrate_task = asyncio.create_task(
+            self._rehydrate_did_entries(wm), name="durable-rehydrate"
+        )
 
         # 2. Fetch room metadata
         await self._fetch_rooms()
@@ -176,6 +187,9 @@ class CollectorLoop:
 
     async def stop(self) -> None:
         log.info("Stopping collector loop")
+        rt = getattr(self, "_rehydrate_task", None)
+        if rt and not rt.done():
+            rt.cancel()
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -185,8 +199,8 @@ class CollectorLoop:
     # Durable persistence — "no DID is forgotten"
     # ------------------------------------------------------------------
 
-    async def _rehydrate_durable(self) -> None:
-        """Merge the persisted full DID index + seq watermarks from the store.
+    async def _rehydrate_did_entries(self, wm: dict[str, Any]) -> None:
+        """Merge the persisted full DID index from per-DID store keys.
 
         Restarts and free-tier spin-downs used to reset the live index to
         the top-500 committed baseline, forgetting every other DID the
@@ -199,19 +213,13 @@ class CollectorLoop:
         (provider data loss / manual flush), the watermarks are dropped —
         re-ingesting retained messages is the correct recovery there;
         honoring them would strand the counters at zero forever.
-        """
-        # Watermarks first — seeding and polling must respect them.
-        try:
-            wm = parse_watermarks(await self.store.get(SEQ_WATERMARK_KEY))
-        except Exception:
-            wm = {}
-        for room, marks in wm.items():
-            self._seq_lo[room] = marks["lo"]
-            self._seq_hi[room] = marks["hi"]
 
+        Runs as a background task: at 250k+ keys the SCAN+MGET sweep takes
+        minutes and must not block uvicorn's lifespan (startup probe).
+        """
         loaded = 0
         try:
-            keys = await self.store.scan_keys(f"{DID_PERSIST_PREFIX}*")
+            keys = await self.store.scan_keys(f"{DID_PERSIST_PREFIX}*", chunk=2000)
             if keys:
                 values = await self.store.mget_raw(keys)
                 for raw in values:
