@@ -214,6 +214,20 @@ try:
 except (TypeError, ValueError):
     REGISTRY_HEAL_BUDGET = 400
 
+# F1 shared-CPU protection (2026-09-22 boot throttle): the one-time recovery
+# sweep over an oversized store (600k+ fri:d: keys) ran hot enough to trip
+# App Service's resource governor mid-boot — the generation died before it
+# could converge. Pace the sweep: a nap between MGET/DELETE chunks keeps the
+# event loop responsive (health stays up) and the 5-min CPU envelope flat.
+REHYDRATE_PACE_S = max(
+    0.0, float(os.environ.get("FRI_REHYDRATE_PACE_S", 0.15))
+)
+# Grace period before the background rehydrate starts, so /api/health and
+# the cheap loops answer first on a fresh boot.
+REHYDRATE_DELAY_S = max(
+    0.0, float(os.environ.get("FRI_REHYDRATE_DELAY_S", 20))
+)
+
 # ---------------------------------------------------------------------------
 # TQR score weights (unchanged from v1)
 # ---------------------------------------------------------------------------

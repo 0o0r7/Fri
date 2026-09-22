@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -21,6 +23,12 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 log = logging.getLogger("fri.store")
+
+# An OOM store fails EVERY write — logging each failure turned the failure
+# itself into a CPU/IO burden on the F1 worker (2026-09-22 boot throttle).
+# Log at most one line per op per window; the errors counter in stats()
+# stays the honest, always-current signal.
+ERR_LOG_EVERY_S = max(1.0, float(os.environ.get("FRI_ERR_LOG_EVERY_S", 60)))
 
 
 def _safe_target(url: str) -> str:
@@ -52,6 +60,7 @@ class Store:
     def __init__(self, url: str = "redis://redis:6379") -> None:
         self.url = url
         self.errors = 0  # failed high-level ops since boot (health signal)
+        self._err_last: dict[str, float] = {}  # op -> last logged (monotonic)
 
         kwargs: dict[str, Any] = dict(
             decode_responses=True,
@@ -101,13 +110,20 @@ class Store:
         OOM signal the dashboard needs to surface."""
         return {"store_errors": self.errors}
 
+    def _err_note(self, op: str, detail: str, e: Exception) -> None:
+        """Count the failure always; log it at most once per window per op."""
+        now = time.monotonic()
+        if now - self._err_last.get(op, 0.0) >= ERR_LOG_EVERY_S:
+            self._err_last[op] = now
+            log.warning("store.%s(%s) failed: %s", op, detail, e)
+
     async def set(self, key: str, value: dict[str, Any]) -> bool:
         try:
             await self._redis.set(key, json.dumps(value))
             return True
         except Exception as e:
             self.errors += 1
-            log.warning("store.set(%s) failed: %s", key, e)
+            self._err_note("set", key, e)
             return False
 
     async def get(self, key: str) -> dict[str, Any] | None:
@@ -116,7 +132,7 @@ class Store:
             return json.loads(data) if data else None
         except Exception as e:
             self.errors += 1
-            log.warning("store.get(%s) failed: %s", key, e)
+            self._err_note("get", key, e)
             return None
 
     async def publish(self, channel: str, message: dict[str, Any]) -> bool:
@@ -125,7 +141,7 @@ class Store:
             return True
         except Exception as e:
             self.errors += 1
-            log.debug("store.publish(%s) failed: %s", channel, e)
+            self._err_note("publish", channel, e)
             return False
 
     # ------------------------------------------------------------------

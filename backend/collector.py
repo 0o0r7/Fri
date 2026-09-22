@@ -34,6 +34,8 @@ from collector.config import (
     KEEP_REGISTRY,
     PRUNE_INTERVAL_S,
     PROTOCOL_VERSIONS,
+    REHYDRATE_DELAY_S,
+    REHYDRATE_PACE_S,
     ROOMS_LIMIT,
     ROOM_MESSAGE_LIMITS,
     ROOMS_TIMEOUT_S,
@@ -179,7 +181,8 @@ class CollectorLoop:
             self._seq_lo[room] = marks["lo"]
             self._seq_hi[room] = marks["hi"]
         self._rehydrate_task = asyncio.create_task(
-            self._rehydrate_did_entries(wm), name="durable-rehydrate"
+            self._rehydrate_did_entries(wm, delay_s=REHYDRATE_DELAY_S),
+            name="durable-rehydrate",
         )
 
         # 2. Fetch room metadata
@@ -277,7 +280,9 @@ class CollectorLoop:
     # Durable persistence — "no DID is forgotten"
     # ------------------------------------------------------------------
 
-    async def _rehydrate_did_entries(self, wm: dict[str, Any]) -> None:
+    async def _rehydrate_did_entries(
+        self, wm: dict[str, Any], delay_s: float = 0.0
+    ) -> None:
         """Merge the persisted full DID index from per-DID store keys — capped.
 
         Restarts and free-tier spin-downs used to reset the live index to
@@ -300,6 +305,10 @@ class CollectorLoop:
         re-ingesting retained messages is the correct recovery there.
         """
         loaded = 0
+        # Boot grace (F1 throttle protection): let /api/health and the cheap
+        # loops answer before the heavy sweep touches the store.
+        if delay_s > 0:
+            await asyncio.sleep(delay_s)
         try:
             await self._load_protected_fps()
             keys = await self.store.scan_keys(f"{DID_PERSIST_PREFIX}*", chunk=2000)
@@ -416,6 +425,11 @@ class CollectorLoop:
                         )
                     else:
                         delete_keys.append(key)
+            # F1 shared-CPU pacing: the old full-speed sweep tripped the
+            # App Service resource governor mid-boot and the generation
+            # died before the one-time recovery could converge.
+            if REHYDRATE_PACE_S > 0:
+                await asyncio.sleep(REHYDRATE_PACE_S)
 
         # Pass 2 — hydrate the surviving ACTIVE entries (heap finalized).
         active_pairs: list[tuple[float, str]] = []
@@ -443,6 +457,8 @@ class CollectorLoop:
                         fp,
                     )
                 )
+            if REHYDRATE_PACE_S > 0:
+                await asyncio.sleep(REHYDRATE_PACE_S)
 
         # Index the survivors, delete the losers (frees ceiling pressure).
         try:
@@ -453,18 +469,27 @@ class CollectorLoop:
         except Exception as e:
             log.warning("durable idx build failed (prune loop will retry): %s", e)
         if delete_keys:
-            try:
-                deleted = await self.store.delete(delete_keys)
-                log.warning(
-                    "recovery prune: %d/%d oversized durable entries deleted "
-                    "(caps: active=%d reg=%d)",
-                    deleted,
-                    len(delete_keys),
-                    KEEP_ACTIVE,
-                    KEEP_REGISTRY,
-                )
-            except Exception as e:
-                log.warning("recovery prune deletes failed: %s", e)
+            # Sliced + paced deletes: one huge pipeline batch against an
+            # oversized store stalls both the Valkey server thread and the
+            # event loop; slices keep the blast radius small.
+            deleted = 0
+            for i in range(0, len(delete_keys), 5000):
+                try:
+                    deleted += await self.store.delete(
+                        delete_keys[i : i + 5000]
+                    )
+                except Exception as e:
+                    log.warning("recovery prune delete slice failed: %s", e)
+                if REHYDRATE_PACE_S > 0:
+                    await asyncio.sleep(REHYDRATE_PACE_S)
+            log.warning(
+                "recovery prune: %d/%d oversized durable entries deleted "
+                "(caps: active=%d reg=%d)",
+                deleted,
+                len(delete_keys),
+                KEEP_ACTIVE,
+                KEEP_REGISTRY,
+            )
         return loaded
 
     @staticmethod
