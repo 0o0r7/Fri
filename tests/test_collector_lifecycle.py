@@ -60,6 +60,13 @@ class FakeStore:
     async def smembers(self, key):
         return set(self._sets.get(key, set()))
 
+    async def zadd_multi(self, key, pairs):
+        # Prune-index upkeep (free-tier hardening) — tracked but inert here.
+        self._zsets = getattr(self, "_zsets", {})
+        zs = self._zsets.setdefault(key, {})
+        for score, member in pairs:
+            zs[member] = score
+
     async def publish(self, channel, message):
         self.published.append((channel, message))
         if self.fail_publish:
@@ -145,7 +152,7 @@ class TestLifecycle:
             "fri:counts",
             "fri:health",
         }
-        assert task_count == 9  # 6 core loops + persist + backfill + registry
+        assert task_count == 10  # 6 core loops + persist + prune + backfill + registry
         assert last_seq == 2  # seeded from the mock lobby backlog
         assert dids >= 2  # committed baseline hydration + live seed
         assert cancelled

@@ -28,9 +28,15 @@ from collector.config import (
     ALWAYS_POLL_ROOMS,
     DID_PERSIST_INTERVAL_S,
     DID_PERSIST_PREFIX,
+    KEEP_ACTIVE,
+    KEEP_JUNK,
+    KEEP_KNOWN,
+    KEEP_REGISTRY,
+    PRUNE_INTERVAL_S,
     PROTOCOL_VERSIONS,
     ROOMS_LIMIT,
     ROOM_MESSAGE_LIMITS,
+    ROOMS_TIMEOUT_S,
     SEQ_WATERMARK_KEY,
     TOP_N,
     USER_AGENT,
@@ -43,12 +49,23 @@ from collector.tclk import TclkIndex
 
 from .backfill import backfill_loop, parse_watermarks, persist_watermarks
 from .eventbus import EventBus
-from .registry import registry_loop
+from .registry import (
+    REGISTRY_JUNK_KEY,
+    REGISTRY_KNOWN_KEY,
+    REGISTRY_PRIORITY_KEY,
+    registry_loop,
+)
 from .store import Store
 
 log = logging.getLogger("fri.collector")
 
 REDIS_CHANNEL = "fri:events"
+
+# Zset eviction indexes for the durable per-DID store (free-tier caps).
+# member = fingerprint, score = recency epoch — the prune loop evicts the
+# lowest-scored tail without ever scanning the values themselves.
+IDX_ACTIVE_KEY = "fri:idx:active"
+IDX_REG_KEY = "fri:idx:reg"
 
 
 def _env_interval(name: str, default: float) -> float:
@@ -119,20 +136,35 @@ class CollectorLoop:
         # Health
         self.technocore_ok = True
         self.last_success = time.time()
+        self._boot_ts = time.time()
 
         # Background tasks
         self._tasks: list[asyncio.Task] = []
         self._last_health_snapshot = 0.0
+        # Free-tier hardening (2026-09-22): loop-crash counters (health
+        # liveness), prune statistics, and fingerprints that must never
+        # be evicted from the durable store (operator-pinned DIDs).
+        self._loop_failures: dict[str, int] = {}
+        self.prune_stats: dict[str, Any] = {}
+        self._protected_fps: set[str] = set()
 
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
+        if self._tasks and any(not t.done() for t in self._tasks):
+            log.warning("collector.start() called on a live collector — ignoring")
+            return
         log.info("Starting collector loop (base_url=%s)", self.base_url)
 
-        # 1. Seed Redis from committed JSON so frontend has data immediately
-        await self._seed_from_committed()
+        # Boot steps 1-5 are individually guarded: a failure (Redis at its
+        # plan ceiling, technocore hanging, anything) must NEVER raise out
+        # of start() — the old raise-into-_retry_collector_start pattern
+        # turned every boot into a CPU-burning retry storm that wedged the
+        # F1 worker. Degraded beats dead: the HTTP service stays up and
+        # the background loops below ALWAYS spawn.
+        await self._guard("seed-from-committed", self._seed_from_committed)
 
         # 1b. Durable layer: room watermarks FIRST — a single fast GET that
         # polling must respect before any live seeding. The heavy per-DID
@@ -151,39 +183,85 @@ class CollectorLoop:
         )
 
         # 2. Fetch room metadata
-        await self._fetch_rooms()
+        await self._guard("fetch-rooms", self._fetch_rooms)
 
         # 3. Keep monitored set focused on key protocol rooms only.
         #    Adding top rooms from /rooms causes too many concurrent
         #    long-polls and triggers technocore's rate limiter (429).
 
         # 4. Seed indices by fetching recent messages from all monitored rooms
-        await self._seed_rooms()
+        await self._guard("seed-rooms", self._seed_rooms)
 
         # 5. Initial snapshot + publish
-        await self._snapshot_all()
+        await self._guard("snapshot-all", self._snapshot_all)
 
-        # 6. Start background tasks
+        # 6. Start background tasks — supervised: a crashed loop restarts
+        # with backoff instead of silently dying (a dead health loop was
+        # half of the frozen-payload lie).
         self._tasks = [
-            asyncio.create_task(self._poll_all_rooms(), name="poll-rooms"),
-            asyncio.create_task(self._rooms_loop(), name="rooms-loop"),
-            asyncio.create_task(self._snapshot_loop(), name="snapshot-loop"),
-            asyncio.create_task(self._counts_loop(), name="counts-loop"),
-            asyncio.create_task(self._health_loop(), name="health-loop"),
-            asyncio.create_task(
-                self._health_snapshot_loop(), name="health-snapshot-loop"
-            ),
+            self._spawn("poll-rooms", self._poll_all_rooms),
+            self._spawn("rooms-loop", self._rooms_loop),
+            self._spawn("snapshot-loop", self._snapshot_loop),
+            self._spawn("counts-loop", self._counts_loop),
+            self._spawn("health-loop", self._health_loop),
+            self._spawn("health-snapshot-loop", self._health_snapshot_loop),
             # Durability layer: full-ring export sweeps, the persistent
-            # did-note registry, and write-through index persistence.
-            asyncio.create_task(self._persist_loop(), name="did-persist"),
-            asyncio.create_task(backfill_loop(self), name="backfill"),
-            asyncio.create_task(registry_loop(self), name="did-registry"),
+            # did-note registry, write-through index persistence, and the
+            # free-tier prune cycle.
+            self._spawn("did-persist", self._persist_loop),
+            self._spawn("prune", self._prune_loop),
+            self._spawn("backfill", lambda: backfill_loop(self)),
+            self._spawn("did-registry", lambda: registry_loop(self)),
         ]
         log.info(
             "Collector started — monitoring %d rooms "
-            "(backfill + registry sweeps running in background)",
+            "(backfill + registry + prune sweeps running in background)",
             len(self.monitored),
         )
+
+    async def _guard(self, step: str, coro_fn) -> None:
+        """Run one boot step; a failure degrades instead of killing start()."""
+        try:
+            await coro_fn()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            self.technocore_ok = False
+            log.error(
+                "boot step %s failed (%s: %s) — continuing degraded",
+                step,
+                type(e).__name__,
+                e,
+            )
+
+    def _spawn(self, name: str, factory) -> asyncio.Task:
+        """Supervise a background loop: restart on unexpected death.
+
+        CancelledError propagates (shutdown path). Restart backoff keeps a
+        crash-looping task from becoming a CPU storm.
+        """
+
+        async def supervised() -> None:
+            backoff = 5.0
+            while True:
+                try:
+                    await factory()
+                    return
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self._loop_failures[name] = self._loop_failures.get(name, 0) + 1
+                    log.error(
+                        "loop %s crashed (%s: %s) — restarting in %.0fs",
+                        name,
+                        type(e).__name__,
+                        e,
+                        backoff,
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, 300.0)
+
+        return asyncio.create_task(supervised(), name=name)
 
     async def stop(self) -> None:
         log.info("Stopping collector loop")
@@ -200,38 +278,33 @@ class CollectorLoop:
     # ------------------------------------------------------------------
 
     async def _rehydrate_did_entries(self, wm: dict[str, Any]) -> None:
-        """Merge the persisted full DID index from per-DID store keys.
+        """Merge the persisted full DID index from per-DID store keys — capped.
 
         Restarts and free-tier spin-downs used to reset the live index to
-        the top-500 committed baseline, forgetting every other DID the
-        process had ever observed. The write-through store keys
-        (fri:d:<fingerprint>) are the durable truth: re-merged at boot
-        with max-merge semantics (see DidIndex.hydrate_entry), then live
-        ingest continues on top.
+        the top-500 committed baseline; the write-through store keys
+        (fri:d:<fingerprint>) are the durable truth re-merged at boot.
+
+        Free-tier hardening (2026-09-22): the store once held 600k+
+        fri:d:* entries (~10x the Aiven free-1 ceiling), which is exactly
+        what pushed writes into OOM failure. This pass therefore keeps
+        only the survivors — top KEEP_ACTIVE by message volume, the
+        newest KEEP_REGISTRY identities, plus operator-pinned fps —
+        DELETES the rest, and zset-indexes the kept entries
+        (fri:idx:active / fri:idx:reg) so the prune loop can maintain the
+        caps afterwards. On a right-sized store this is a plain hydrate
+        (everything is kept). Runs as a background task: at scale the
+        sweep takes minutes and must not block uvicorn's lifespan.
 
         Self-healing: if the store holds watermarks but ZERO did entries
         (provider data loss / manual flush), the watermarks are dropped —
-        re-ingesting retained messages is the correct recovery there;
-        honoring them would strand the counters at zero forever.
-
-        Runs as a background task: at 250k+ keys the SCAN+MGET sweep takes
-        minutes and must not block uvicorn's lifespan (startup probe).
+        re-ingesting retained messages is the correct recovery there.
         """
         loaded = 0
         try:
+            await self._load_protected_fps()
             keys = await self.store.scan_keys(f"{DID_PERSIST_PREFIX}*", chunk=2000)
             if keys:
-                values = await self.store.mget_raw(keys)
-                for raw in values:
-                    if not raw:
-                        continue
-                    try:
-                        entry = json.loads(raw)
-                    except json.JSONDecodeError:
-                        continue
-                    if isinstance(entry, dict):
-                        if self.did_index.hydrate_entry(entry):
-                            loaded += 1
+                loaded = await self._rehydrate_indexed(keys)
         except Exception as e:
             log.warning("durable did rehydrate failed: %s", e)
 
@@ -250,6 +323,149 @@ class CollectorLoop:
             loaded,
             len(wm) if loaded else 0,
         )
+
+    async def _load_protected_fps(self) -> None:
+        """Operator-pinned fingerprints must survive every prune pass."""
+        self._protected_fps = set()
+        try:
+            self._protected_fps = set(
+                await self.store.smembers(REGISTRY_PRIORITY_KEY)
+            )
+        except Exception as e:
+            log.warning("priority fps unavailable (%s) — prune skips pin protection", e)
+
+    @staticmethod
+    def _ts_epoch(ts: str | None) -> float:
+        """Epoch seconds of an ISO-Z timestamp; 0.0 when unparseable."""
+        if ts:
+            try:
+                return datetime.fromisoformat(
+                    str(ts).replace("Z", "+00:00")
+                ).timestamp()
+            except (ValueError, TypeError, OSError):
+                pass
+        return 0.0
+
+    def _recency_score(self, stats: DidStats) -> float:
+        """Zset score for eviction order: active by last_active, else now."""
+        return (
+            self._ts_epoch(stats.last_active)
+            or self._ts_epoch(stats.first_seen)
+            or time.time()
+        )
+
+    async def _rehydrate_indexed(self, keys: list[str]) -> int:
+        """Classify + select + hydrate + index the durable entries.
+
+        Pass 1 streams every value once (classify only): active DIDs
+        compete for KEEP_ACTIVE slots by message volume (min-heap), the
+        first KEEP_REGISTRY identities encountered are kept, everything
+        else is queued for deletion. Pass 2 re-fetches and hydrates the
+        surviving active entries, indexes all survivors, and deletes the
+        losers — the one-time recovery that pulls an oversized store back
+        under its ceiling.
+        """
+        import heapq
+
+        loaded = 0
+        kept_reg = 0
+        reg_pairs: list[tuple[float, str]] = []
+        active_heap: list[tuple[int, str, str]] = []  # (messages, fp, key)
+        delete_keys: list[str] = []
+
+        for i in range(0, len(keys), 500):
+            chunk = keys[i : i + 500]
+            values = await self.store.mget_raw(chunk)
+            for key, raw in zip(chunk, values):
+                if not raw:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                fp = key[len(DID_PERSIST_PREFIX) :]
+                if fp in self._protected_fps:
+                    if self.did_index.hydrate_entry(entry):
+                        loaded += 1
+                    reg_pairs.append(
+                        (self._ts_epoch(entry.get("first_seen")) or time.time(), fp)
+                    )
+                    continue
+                try:
+                    signed = int(entry.get("messages_signed") or 0)
+                except (TypeError, ValueError):
+                    signed = 0
+                if signed > 0:
+                    heapq.heappush(active_heap, (signed, fp, key))
+                    if len(active_heap) > KEEP_ACTIVE:
+                        _, _, dropped_key = heapq.heappop(active_heap)
+                        delete_keys.append(dropped_key)
+                else:
+                    if kept_reg < KEEP_REGISTRY:
+                        kept_reg += 1
+                        if self.did_index.hydrate_entry(entry):
+                            loaded += 1
+                        reg_pairs.append(
+                            (
+                                self._ts_epoch(entry.get("first_seen"))
+                                or time.time(),
+                                fp,
+                            )
+                        )
+                    else:
+                        delete_keys.append(key)
+
+        # Pass 2 — hydrate the surviving ACTIVE entries (heap finalized).
+        active_pairs: list[tuple[float, str]] = []
+        kept_active_keys = [t[2] for t in active_heap]
+        for i in range(0, len(kept_active_keys), 500):
+            chunk = kept_active_keys[i : i + 500]
+            values = await self.store.mget_raw(chunk)
+            for key, raw in zip(chunk, values):
+                if not raw:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                if self.did_index.hydrate_entry(entry):
+                    loaded += 1
+                fp = key[len(DID_PERSIST_PREFIX) :]
+                active_pairs.append(
+                    (
+                        self._ts_epoch(entry.get("last_active"))
+                        or self._ts_epoch(entry.get("first_seen"))
+                        or time.time(),
+                        fp,
+                    )
+                )
+
+        # Index the survivors, delete the losers (frees ceiling pressure).
+        try:
+            if active_pairs:
+                await self.store.zadd_multi(IDX_ACTIVE_KEY, active_pairs)
+            if reg_pairs:
+                await self.store.zadd_multi(IDX_REG_KEY, reg_pairs)
+        except Exception as e:
+            log.warning("durable idx build failed (prune loop will retry): %s", e)
+        if delete_keys:
+            try:
+                deleted = await self.store.delete(delete_keys)
+                log.warning(
+                    "recovery prune: %d/%d oversized durable entries deleted "
+                    "(caps: active=%d reg=%d)",
+                    deleted,
+                    len(delete_keys),
+                    KEEP_ACTIVE,
+                    KEEP_REGISTRY,
+                )
+            except Exception as e:
+                log.warning("recovery prune deletes failed: %s", e)
+        return loaded
 
     @staticmethod
     def _durable_entry(stats: DidStats) -> dict[str, Any]:
@@ -300,6 +516,8 @@ class CollectorLoop:
         dirty = self.did_index.pop_dirty()
         if dirty:
             mapping: dict[str, str] = {}
+            active_pairs: list[tuple[float, str]] = []
+            reg_pairs: list[tuple[float, str]] = []
             for did in dirty:
                 stats = self.did_index.get(did)
                 if stats is None:
@@ -308,9 +526,22 @@ class CollectorLoop:
                 mapping[f"{DID_PERSIST_PREFIX}{fp}"] = json.dumps(
                     self._durable_entry(stats), separators=(",", ":")
                 )
+                # Eviction-index upkeep: one pipeline ZADD per flush cycle,
+                # so the prune loop never has to scan values to enforce the
+                # free-tier caps.
+                if stats.messages_signed > 0:
+                    active_pairs.append((self._recency_score(stats), fp))
+                else:
+                    reg_pairs.append(
+                        (self._ts_epoch(stats.first_seen) or time.time(), fp)
+                    )
             try:
                 if mapping:
                     await self.store.mset_raw(mapping)
+                    if active_pairs:
+                        await self.store.zadd_multi(IDX_ACTIVE_KEY, active_pairs)
+                    if reg_pairs:
+                        await self.store.zadd_multi(IDX_REG_KEY, reg_pairs)
             except Exception:
                 # pop_dirty() already cleared the set — re-queue so the
                 # next cycle retries instead of silently losing writes.
@@ -384,25 +615,60 @@ class CollectorLoop:
         )
 
     async def _fetch_rooms(self) -> None:
-        """GET /rooms?format=json — room metadata for scoring."""
-        try:
-            resp = await self.client.get(
-                "/rooms",
-                params={"format": "json", "limit": ROOMS_LIMIT},
-                timeout=httpx.Timeout(60.0, connect=10.0),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            for r in data.get("rooms", []):
-                name = r.get("room")
-                if name:
-                    self.room_metas[name] = r
-            self.technocore_ok = True
-            self.last_success = time.time()
-            log.info("Fetched %d rooms", len(self.room_metas))
-        except Exception as e:
-            self.technocore_ok = False
-            log.warning("fetch_rooms failed: %s", e)
+        """GET /rooms?format=json — room metadata for scoring.
+
+        Upstream hang regression (2026-09-21): /rooms?limit=N HANGS for
+        most N (limit=1 ok, no-limit ok in ~0.04s, limit=20 slow-200,
+        limit=150/50/100/2/3/5/10 hang). The limited fetch gets a bounded
+        timeout, then falls back to the no-limit form; on total failure
+        the previously cached metas are kept (blanking them would zero
+        room scoring until the next successful fetch).
+        """
+        for attempt, params in enumerate(
+            ({"format": "json", "limit": ROOMS_LIMIT}, {"format": "json"})
+        ):
+            try:
+                resp = await self.client.get(
+                    "/rooms",
+                    params=params,
+                    timeout=httpx.Timeout(ROOMS_TIMEOUT_S, connect=10.0),
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                rooms = data.get("rooms", [])
+                if not rooms and attempt == 0:
+                    log.warning(
+                        "fetch_rooms(limit=%s) returned 0 rooms — trying "
+                        "no-limit fallback",
+                        ROOMS_LIMIT,
+                    )
+                    continue
+                for r in rooms:
+                    name = r.get("room")
+                    if name:
+                        self.room_metas[name] = r
+                self.technocore_ok = True
+                self.last_success = time.time()
+                log.info("Fetched %d rooms (limit=%s)", len(rooms), params.get("limit"))
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                if attempt == 0:
+                    log.warning(
+                        "fetch_rooms(limit=%s) failed (%s) — trying no-limit "
+                        "fallback",
+                        ROOMS_LIMIT,
+                        e,
+                    )
+                else:
+                    self.technocore_ok = False
+                    log.warning(
+                        "fetch_rooms fallback failed too: %s — keeping %d "
+                        "cached metas",
+                        e,
+                        len(self.room_metas),
+                    )
 
     async def _seed_rooms(self) -> None:
         """Fetch initial messages from all monitored rooms to seed indices."""
@@ -602,6 +868,97 @@ class CollectorLoop:
             await self._publish_health()
 
     # ------------------------------------------------------------------
+    # Free-tier prune — keep the store under its plan ceiling
+    # ------------------------------------------------------------------
+
+    async def _prune_loop(self) -> None:
+        """Every PRUNE_INTERVAL_S: enforce the durable-store caps.
+
+        The Aiven free-1 ceiling (~30 MB) is what the Sep 21-22 wedge was
+        made of: writes failed OOM, snapshots raised, the retry storm
+        burned F1. This loop keeps the store right-sized BY POLICY.
+        """
+        while True:
+            await asyncio.sleep(PRUNE_INTERVAL_S)
+            try:
+                await self._prune_once()
+            except Exception as e:
+                log.warning("prune cycle failed: %s", e)
+
+    async def _prune_once(self) -> dict[str, Any]:
+        """One cap-enforcement pass. Never raises (loop-safe).
+
+        - fri:d:<fp> entries: evict the lowest-recency tail via the
+          fri:idx:* zsets (no value scans), protecting operator pins.
+        - fri:reg:known / fri:reg:junk: SPOP-trim; the only cost of
+          trimming is polite re-fetch churn on a later sweep.
+        """
+        stats: dict[str, Any] = {
+            "active_evicted": 0,
+            "reg_evicted": 0,
+            "known_trimmed": 0,
+            "junk_trimmed": 0,
+            "dbsize": None,
+        }
+        try:
+            stats["dbsize"] = await self.store.dbsize()
+        except Exception:
+            pass
+
+        for idx_key, cap, kind in (
+            (IDX_ACTIVE_KEY, KEEP_ACTIVE, "active"),
+            (IDX_REG_KEY, KEEP_REGISTRY, "reg"),
+        ):
+            try:
+                size = await self.store.zcard(idx_key)
+                excess = size - cap
+                if excess > 0:
+                    # Candidate window = excess + pinned fps: protected
+                    # members must not consume cap slots, so the window
+                    # reaches past them and `excess` NON-protected members
+                    # are evicted (exact convergence, pins never touched).
+                    window = min(excess + len(self._protected_fps), 50_000)
+                    members = await self.store.zrange(idx_key, 0, window - 1)
+                    candidates = [
+                        m for m in members if m not in self._protected_fps
+                    ][:excess]
+                    if candidates:
+                        await self.store.delete(
+                            [f"{DID_PERSIST_PREFIX}{m}" for m in candidates]
+                        )
+                        await self.store.zrem(idx_key, candidates)
+                        stats[f"{kind}_evicted"] = len(candidates)
+            except Exception as e:
+                log.warning("prune %s failed: %s", kind, e)
+
+        for set_key, cap, stat_name in (
+            (REGISTRY_KNOWN_KEY, KEEP_KNOWN, "known_trimmed"),
+            (REGISTRY_JUNK_KEY, KEEP_JUNK, "junk_trimmed"),
+        ):
+            try:
+                size = await self.store.scard(set_key)
+                excess = size - cap
+                if excess > 0:
+                    popped = await self.store.spop(set_key, min(excess, 50_000))
+                    stats[stat_name] = len(popped)
+            except Exception as e:
+                log.warning("prune %s failed: %s", set_key, e)
+
+        stats["at"] = _now()
+        self.prune_stats = stats
+        if any(
+            stats[k]
+            for k in (
+                "active_evicted",
+                "reg_evicted",
+                "known_trimmed",
+                "junk_trimmed",
+            )
+        ):
+            log.info("prune cycle: %s", stats)
+        return stats
+
+    # ------------------------------------------------------------------
     # Snapshots
     # ------------------------------------------------------------------
 
@@ -698,7 +1055,19 @@ class CollectorLoop:
             "technocore_ok": self.technocore_ok,
             "last_success": self.last_success,
             "timestamp": _now(),
+            # Process-local liveness (2026-09-22): a frozen Redis payload
+            # answering "ok" while every loop is dead is exactly how the
+            # Sep 21 wedge stayed invisible. These fields are verifiable.
+            "uptime_s": int(time.time() - self._boot_ts),
+            "loops": {t.get_name(): (not t.done()) for t in self._tasks},
+            "loop_failures": dict(self._loop_failures),
+            "dids_tracked": self.did_index.total_dids,
+            "registry_only_tracked": self.did_index.registry_only_count(),
+            "prune": self.prune_stats or None,
         }
+        stats_fn = getattr(self.store, "stats", None)
+        if callable(stats_fn):
+            health.update(stats_fn())  # store_errors — the OOM signal
         await self.store.set("fri:health", health)
         await self._emit({"type": "health", **health})
 

@@ -44,7 +44,9 @@ def _now() -> str:
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 BASE_URL = os.environ.get("TECHNOCORE_BASE_URL", "https://technocore.chat")
 
-COLLECTOR_RETRY_S = float(os.environ.get("FRI_COLLECTOR_RETRY_S", "30"))
+COLLECTOR_RETRY_S = float(os.environ.get("FRI_COLLECTOR_RETRY_S", "60"))
+COLLECTOR_RETRY_MAX_S = float(os.environ.get("FRI_COLLECTOR_RETRY_MAX_S", "600"))
+PROCESS_START = time.time()
 
 # SSE event fan-out: "memory" (default) uses the in-process EventBus — the
 # single-instance deployment needs no Redis pub/sub, and cutting it removes
@@ -151,12 +153,19 @@ async def _retry_collector_start(
 
     Keeps the HTTP service alive (degraded) so /api/health keeps answering
     and the frontend's static-fallback keeps working while Redis is down.
+
+    Exponential damping (2026-09-22): the flat 30s cadence + a heavy
+    start() (room seeding + full snapshot) IS a retry storm — the Sep 21-22
+    wedge was exactly this loop pinning the CPU at 100%. Backoff grows
+    1x -> 10x base, hard-capped.
     """
+    delay = COLLECTOR_RETRY_S
     while not app.state.collector_ready:
-        await asyncio.sleep(COLLECTOR_RETRY_S)
+        await asyncio.sleep(delay)
         # Fast pre-check: skip the technocore HTTP warm-up while Redis is down
         if not await store.ping():
-            log.warning("Redis still unreachable — retrying in %.0fs", COLLECTOR_RETRY_S)
+            log.warning("Redis still unreachable — retrying in %.0fs", delay)
+            delay = min(delay * 2, COLLECTOR_RETRY_MAX_S)
             continue
         try:
             await collector.start()
@@ -166,8 +175,9 @@ async def _retry_collector_start(
             log.warning(
                 "Collector start retry failed: %s — retrying in %.0fs",
                 e,
-                COLLECTOR_RETRY_S,
+                delay,
             )
+            delay = min(delay * 2, COLLECTOR_RETRY_MAX_S)
 
 
 @asynccontextmanager
@@ -265,7 +275,50 @@ async def health():
             status_code=503,
             content={"status": "unavailable", "redis": False},
         )
-    return await app.state.store.get("fri:health") or {"status": "starting"}
+    payload = await app.state.store.get("fri:health") or {"status": "starting"}
+    return _health_verdict(
+        payload,
+        ready=bool(getattr(app.state, "collector_ready", False)),
+        collector=getattr(app.state, "collector", None),
+        store=getattr(app.state, "store", None),
+    )
+
+
+def _health_verdict(payload: dict, ready: bool, collector, store) -> dict:
+    """Honest health answer (2026-09-22 wedge fix).
+
+    The old endpoint returned the Redis fri:health payload verbatim — a
+    payload written by a background loop and frozen exactly when the loop
+    died, so a wedged worker answered status:ok for days. Now:
+
+    - collector ready  -> the verdict comes from the LIVE in-process
+      collector object (its state cannot be a frozen leftover);
+    - collector not ready -> the payload is from a previous run: report
+      "starting" (fresh boot, <10 min) or "degraded" — never a stale ok.
+    """
+    out = dict(payload)
+    now = time.time()
+    if collector is not None and ready:
+        age = now - getattr(collector, "last_success", 0.0)
+        live_stale = (not collector.technocore_ok) or age > 90
+        out["status"] = "degraded" if live_stale else "ok"
+        out["stale"] = live_stale
+        out["technocore_ok"] = collector.technocore_ok
+        out["last_success"] = collector.last_success
+        out["timestamp"] = _now()
+        out["uptime_s"] = int(now - PROCESS_START)
+        loops = getattr(collector, "_tasks", None)
+        if loops:
+            out["loops"] = {t.get_name(): (not t.done()) for t in loops}
+        out["loop_failures"] = dict(getattr(collector, "_loop_failures", {}))
+        out["prune"] = getattr(collector, "prune_stats", None) or None
+        errors = getattr(store, "errors", None)
+        if errors is not None:
+            out["store_errors"] = errors
+    elif not ready:
+        out["status"] = "starting" if (now - PROCESS_START) < 600 else "degraded"
+        out["stale"] = True
+    return out
 
 
 @app.get("/api/health/snapshots")

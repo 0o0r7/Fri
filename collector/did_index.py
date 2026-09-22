@@ -40,7 +40,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
-from .config import MACHINE_ROOMS
+from .config import KEEP_REGISTRY, MACHINE_ROOMS
 from .spam import (
     CATEGORY_CLEAN,
     CATEGORY_CAMPAIGN,
@@ -240,15 +240,62 @@ class DidIndex:
         # (backend write-through to the fri:d:* store keys). The batch
         # pipeline never flushes, so the set simply grows there unused.
         self._dirty: set = set()
-
-    def mark_dirty(self, did: str) -> None:
-        self._dirty.add(did)
+        # Registry-only identities (zero messages, did-note profile). The
+        # registry sweep walks 1.4M+ persistent notes, so without a cap this
+        # set — and the RAM index behind it — grows unbounded and eventually
+        # wedges a 1 GB App Service worker. Capped at KEEP_REGISTRY (oldest
+        # first_seen evicted); evicted identities stay re-derivable upstream
+        # and re-enter via the sweep's heal budget.
+        self._registry_only: set = set()
+        self.max_registry = KEEP_REGISTRY
 
     def pop_dirty(self) -> set:
         """Return and clear the dirty set (persistence flush boundary)."""
         out = self._dirty
         self._dirty = set()
         return out
+
+    def mark_dirty(self, did: str) -> None:
+        self._dirty.add(did)
+
+    def _classify(self, did: str, messages_signed: int, identity_note: bool) -> None:
+        """Track registry-only membership (called by every hydration path)."""
+        if messages_signed == 0 and identity_note:
+            self._registry_only.add(did)
+        else:
+            self._registry_only.discard(did)
+
+    def registry_only_count(self) -> int:
+        return len(self._registry_only)
+
+    def _evict_oldest_registry(self) -> str | None:
+        """Evict the oldest registry-only identity when over the cap.
+
+        Linear scan over the capped set (<= KEEP_REGISTRY entries) is cheap
+        at registry cadence. Returns the evicted did, if any. Evicting a
+        dirty did is safe: the persist flush skips vanished stats, and the
+        identity re-enters via the registry sweep's heal budget.
+        """
+        if len(self._registry_only) <= self.max_registry:
+            return None
+        oldest_did, oldest_ts = None, None
+        for did in list(self._registry_only):
+            stats = self._dids.get(did)
+            if stats is None:  # stale membership — drop it
+                self._registry_only.discard(did)
+                continue
+            # Entries without first_seen were just registered (the sweep
+            # does not stamp first_seen until a durable round-trip) — sort
+            # them as the NEWEST so brand-new identities are never the
+            # first eviction victims.
+            ts = stats.first_seen or "\uffff"
+            if oldest_ts is None or ts < oldest_ts:
+                oldest_did, oldest_ts = did, ts
+        if oldest_did is None:
+            return None
+        self._registry_only.discard(oldest_did)
+        self._dids.pop(oldest_did, None)
+        return oldest_did
 
     def ingest_message(self, room: str, message: Dict[str, Any]) -> None:
         """Update the index with one message. Only signed messages count."""
@@ -265,6 +312,7 @@ class DidIndex:
             self._dids[frm] = stats
         stats.ingest(room=room, ts=ts, text=text, spam_category=verdict.category)
         self._dirty.add(frm)
+        self._classify(frm, stats.messages_signed, stats.identity_note)
 
     def register_identity(self, did: str, bio: str | None = None) -> bool:
         """Register a DID from the persistent did-note registry (no messages).
@@ -283,11 +331,14 @@ class DidIndex:
             stats = DidStats(did=did, identity_note=True, profile_bio=bio)
             self._dids[did] = stats
             self._dirty.add(did)
+            self._classify(did, 0, True)
+            self._evict_oldest_registry()
             return True
         stats.identity_note = True
         if bio:
             stats.profile_bio = bio
         self._dirty.add(did)
+        self._classify(did, stats.messages_signed, stats.identity_note)
         return False
 
     def ingest_messages(self, room: str, messages: List[Dict[str, Any]]) -> None:
@@ -410,6 +461,7 @@ class DidIndex:
                 identity_note=bool(entry.get("identity_note")),
             )
             self._dirty.add(did)
+            self._classify(did, messages, bool(entry.get("identity_note")))
             restored += 1
         return restored
 
@@ -453,6 +505,7 @@ class DidIndex:
                 profile_bio=entry.get("profile_bio"),
                 identity_note=bool(entry.get("identity_note")),
             )
+            self._classify(did, messages, bool(entry.get("identity_note")))
             return did
 
         # Merge into existing live state — max per counter (both views are
@@ -482,6 +535,7 @@ class DidIndex:
         existing.identity_note = existing.identity_note or bool(
             entry.get("identity_note")
         )
+        self._classify(did, existing.messages_signed, existing.identity_note)
         return did
 
     def search(self, query: str, limit: int = 500) -> List[DidStats]:

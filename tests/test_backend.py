@@ -13,6 +13,7 @@ real route handlers against an in-memory fake store — no Redis, no network.
 
 import asyncio
 import json
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
@@ -182,18 +183,57 @@ class TestHealthSnapshot:
         assert states["c2"] == "claimed"  # terminal outcome → not active
 
 
+class _LiveCollectorStub:
+    """Minimal ready-collector stand-in for /api/health verdict tests."""
+
+    technocore_ok = True
+
+    def __init__(self) -> None:
+        self.last_success = time.time()
+        self._tasks: list = []
+        self._loop_failures: dict = {}
+        self.prune_stats: dict = {}
+
+
 class TestRoutes:
     def _install(self, store: FakeStore) -> FakeStore:
         app.state.store = store
         return store
 
     def test_health_ok_returns_cached_health(self):
+        """With a ready collector the LIVE verdict wins (cached ok + live
+        collector state agree → status ok, enriched with liveness fields)."""
         async def run():
             store = self._install(FakeStore())
             store.data["fri:health"] = {"status": "ok", "stale": False}
+            app.state.collector = _LiveCollectorStub()
+            app.state.collector_ready = True
+            try:
+                return await health()
+            finally:
+                app.state.collector_ready = False
+                app.state.collector = None
+
+        body = asyncio.run(run())
+        assert body["status"] == "ok"
+        assert body["stale"] is False
+        assert body["technocore_ok"] is True
+        assert body["uptime_s"] >= 0
+
+    def test_health_cached_ok_without_collector_is_not_trusted(self):
+        """The Sep 21 wedge lie: a frozen fri:health payload answered ok
+        while every background loop was dead. Without a ready collector a
+        cached ok is a leftover from a previous run — it must be downgraded
+        (starting/degraded), never served verbatim."""
+        async def run():
+            store = self._install(FakeStore())
+            store.data["fri:health"] = {"status": "ok", "stale": False}
+            app.state.collector_ready = False
             return await health()
 
-        assert asyncio.run(run()) == {"status": "ok", "stale": False}
+        body = asyncio.run(run())
+        assert body["status"] in ("starting", "degraded")
+        assert body["stale"] is True
 
     def test_health_returns_503_when_redis_down(self):
         async def run():

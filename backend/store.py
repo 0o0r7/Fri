@@ -34,10 +34,24 @@ def _safe_target(url: str) -> str:
 
 
 class Store:
-    """Thin wrapper around redis.asyncio for JSON caching + pub/sub."""
+    """Thin wrapper around redis.asyncio for JSON caching + pub/sub.
+
+    Two error tiers (2026-09-22 free-tier hardening):
+
+    - HIGH-LEVEL reads/writes (set/get/publish) NEVER raise: a store at its
+      plan ceiling (Aiven free-1 = 30 MB) rejects writes with OOM replies,
+      and a raising snapshot used to kill collector.start(), whose retry
+      loop then burned the F1 CPU quota into a full worker wedge. Here the
+      failure is logged + counted (see stats()) and the loop degrades.
+
+    - LOW-LEVEL primitives (mset_raw, scan_keys, z*/s* helpers) still
+      RAISE: callers that implement their own retry/compensation logic
+      (did-persist re-queue, prune loop) need the real exception.
+    """
 
     def __init__(self, url: str = "redis://redis:6379") -> None:
         self.url = url
+        self.errors = 0  # failed high-level ops since boot (health signal)
 
         kwargs: dict[str, Any] = dict(
             decode_responses=True,
@@ -82,15 +96,37 @@ class Store:
             log.warning("Redis ping failed (%s): %s", _safe_target(self.url), e)
             return False
 
-    async def set(self, key: str, value: dict[str, Any]) -> None:
-        await self._redis.set(key, json.dumps(value))
+    def stats(self) -> dict[str, Any]:
+        """Error counters for /api/health — write failures are the free-tier
+        OOM signal the dashboard needs to surface."""
+        return {"store_errors": self.errors}
+
+    async def set(self, key: str, value: dict[str, Any]) -> bool:
+        try:
+            await self._redis.set(key, json.dumps(value))
+            return True
+        except Exception as e:
+            self.errors += 1
+            log.warning("store.set(%s) failed: %s", key, e)
+            return False
 
     async def get(self, key: str) -> dict[str, Any] | None:
-        data = await self._redis.get(key)
-        return json.loads(data) if data else None
+        try:
+            data = await self._redis.get(key)
+            return json.loads(data) if data else None
+        except Exception as e:
+            self.errors += 1
+            log.warning("store.get(%s) failed: %s", key, e)
+            return None
 
-    async def publish(self, channel: str, message: dict[str, Any]) -> None:
-        await self._redis.publish(channel, json.dumps(message))
+    async def publish(self, channel: str, message: dict[str, Any]) -> bool:
+        try:
+            await self._redis.publish(channel, json.dumps(message))
+            return True
+        except Exception as e:
+            self.errors += 1
+            log.debug("store.publish(%s) failed: %s", channel, e)
+            return False
 
     # ------------------------------------------------------------------
     # Durable per-DID persistence (2026-09 "no DID is forgotten")
@@ -143,6 +179,16 @@ class Store:
     async def zadd(self, key: str, score: float, member: str) -> None:
         await self._redis.zadd(key, {member: score})
 
+    async def zadd_multi(self, key: str, pairs: list[tuple[float, str]]) -> None:
+        """Batch ZADD via non-transactional pipeline (prune-index upkeep)."""
+        if not pairs:
+            return
+        for i in range(0, len(pairs), 500):
+            chunk = pairs[i : i + 500]
+            pipe = self._redis.pipeline(transaction=False)
+            pipe.zadd(key, {member: score for score, member in chunk})
+            await pipe.execute()
+
     async def zrange(self, key: str, start: int, end: int) -> list[str]:
         return await self._redis.zrange(key, start, end)
 
@@ -159,6 +205,49 @@ class Store:
 
     async def zremrangebyscore(self, key: str, min_score: float, max_score: float) -> None:
         await self._redis.zremrangebyscore(key, min_score, max_score)
+
+    # ------------------------------------------------------------------
+    # Prune primitives (raise — the prune loop owns error handling)
+    # ------------------------------------------------------------------
+
+    async def dbsize(self) -> int:
+        return int(await self._redis.dbsize())
+
+    async def zcard(self, key: str) -> int:
+        return int(await self._redis.zcard(key))
+
+    async def zrem(self, key: str, members: list[str]) -> int:
+        if not members:
+            return 0
+        return int(await self._redis.zrem(key, *members))
+
+    async def scard(self, key: str) -> int:
+        return int(await self._redis.scard(key))
+
+    async def spop(self, key: str, count: int) -> list[str]:
+        """Remove and return up to `count` random members (known-set trim)."""
+        if count <= 0:
+            return []
+        out = await self._redis.spop(key, count)
+        return list(out) if out else []
+
+    async def srem(self, key: str, members: list[str]) -> int:
+        if not members:
+            return 0
+        return int(await self._redis.srem(key, *members))
+
+    async def delete(self, keys: list[str]) -> int:
+        """Batch DELETE via non-transactional pipeline (returns deleted count)."""
+        if not keys:
+            return 0
+        deleted = 0
+        for i in range(0, len(keys), 500):
+            pipe = self._redis.pipeline(transaction=False)
+            for key in keys[i : i + 500]:
+                pipe.delete(key)
+            results = await pipe.execute()
+            deleted += sum(1 for r in results if r)
+        return deleted
 
     async def close(self) -> None:
         await self._redis.close()

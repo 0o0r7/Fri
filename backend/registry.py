@@ -50,6 +50,7 @@ import httpx
 from collector.config import (
     PRIORITY_DIDS,
     REGISTRY_DELAY_S,
+    REGISTRY_HEAL_BUDGET,
     REGISTRY_INTERVAL_S,
     REGISTRY_TIMEOUT_S,
 )
@@ -242,7 +243,21 @@ async def sweep_once(collector) -> dict[str, int]:
         }
     except Exception:
         index_fps = set()  # worst case: re-fetch everything known, politely
-    missing = known - index_fps - junk
+    missing_all = known - index_fps - junk
+    # Heal budget (2026-09-22 free-tier hardening): bound the re-fetch work
+    # per sweep. Without it, a pruned durable store turns every sweep into
+    # a 200k+ note re-fetch treadmill — the polite-flood CPU burn that
+    # helped wedge F1. Priority-pinned DIDs heal unconditionally above;
+    # the rest converge back gradually, REGISTRY_HEAL_BUDGET per sweep.
+    missing = set(sorted(missing_all)[:REGISTRY_HEAL_BUDGET])
+    if len(missing_all) > len(missing):
+        log.info(
+            "registry heal budget: %d known-but-missing fps, healing %d this "
+            "sweep (budget %d)",
+            len(missing_all),
+            len(missing),
+            REGISTRY_HEAL_BUDGET,
+        )
     new_fps: list[str] = []
     new_junk: list[str] = []
 

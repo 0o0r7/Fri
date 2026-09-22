@@ -18,6 +18,7 @@ from backend.backfill import ingest_ring, parse_watermarks, select_rooms
 from backend.collector import CollectorLoop
 from backend.eventbus import EventBus
 from backend.registry import parse_note_value, sweep_once
+from collector.config import SEQ_WATERMARK_KEY
 from collector.did_index import did_note_fingerprint
 
 
@@ -50,6 +51,13 @@ class FakeStore:
 
     async def smembers(self, key):
         return set(self._sets.get(key, set()))
+
+    async def zadd_multi(self, key, pairs):
+        # Prune-index upkeep (free-tier hardening) — tracked but inert here.
+        self._zsets = getattr(self, "_zsets", {})
+        zs = self._zsets.setdefault(key, {})
+        for score, member in pairs:
+            zs[member] = score
 
     async def publish(self, channel, message):
         pass
@@ -301,9 +309,15 @@ class TestDurableRoundTrip:
             assert f"fri:d:{did_note_fingerprint(DID_A)}" in store.data
             assert "fri:seq:watermarks" in store.data
 
-            # A fresh process boots on the same store:
+            # A fresh process boots on the same store. Boot contract: the
+            # watermark restore runs synchronously in start(), the durable
+            # rehydrate runs as its background task with the same wm.
             c2 = CollectorLoop(store, base_url="http://x", event_bus=EventBus())
-            await c2._rehydrate_durable()
+            wm = parse_watermarks(await store.get(SEQ_WATERMARK_KEY))
+            for room, marks in wm.items():
+                c2._seq_lo[room] = marks["lo"]
+                c2._seq_hi[room] = marks["hi"]
+            await c2._rehydrate_did_entries(wm)
             a = c2.did_index.get(DID_A)
             b = c2.did_index.get(DID_B)
             wm = (c2._seq_lo.get("lobby"), c2._seq_hi.get("lobby"))
@@ -364,7 +378,11 @@ class TestDurableRoundTrip:
             store = FakeStore()
             await store.set("fri:seq:watermarks", {"lobby": {"lo": 10, "hi": 20}})
             c = CollectorLoop(store, base_url="http://x", event_bus=EventBus())
-            await c._rehydrate_durable()
+            wm = parse_watermarks(await store.get(SEQ_WATERMARK_KEY))
+            for room, marks in wm.items():
+                c._seq_lo[room] = marks["lo"]
+                c._seq_hi[room] = marks["hi"]
+            await c._rehydrate_did_entries(wm)
             lo, hi = c._seq_lo.get("lobby"), c._seq_hi.get("lobby")
             await c.client.aclose()
             return lo, hi

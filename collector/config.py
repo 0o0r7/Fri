@@ -10,8 +10,16 @@ BASE_URL = "https://technocore.chat"
 # Room sampling (TQR v1 — unchanged)
 # ---------------------------------------------------------------------------
 
-# How many rooms to pull from /rooms
-ROOMS_LIMIT = 150
+# How many rooms to pull from /rooms. Env-tunable: the upstream
+# /rooms?limit=N endpoint has a known hang regression for most N
+# (observed 2026-09-21: limit=150 HANGS, limit=20 slow-200, no-limit ok) —
+# the collector falls back to a no-limit fetch when the limited one times
+# out, and this knob lets ops drop the limit without a redeploy.
+try:
+    ROOMS_LIMIT = max(1, int(os.environ.get("FRI_ROOMS_LIMIT", 150)))
+except (TypeError, ValueError):
+    ROOMS_LIMIT = 150
+ROOMS_TIMEOUT_S = 15.0  # bounded wait before the no-limit fallback fires
 
 # After cheap filtering, how many rooms to sample messages from
 SAMPLE_CANDIDATES = 60
@@ -157,6 +165,54 @@ DID_PERSIST_INTERVAL_S = 30.0
 DID_PERSIST_PREFIX = "fri:d:"
 # Per-room seq watermark persistence (prevents cross-boot double counts).
 SEQ_WATERMARK_KEY = "fri:seq:watermarks"
+
+# ---------------------------------------------------------------------------
+# Free-tier caps (2026-09-22 — "stay free" decision)
+#
+# The DID flood (477k -> 689k identities) blew past the Aiven free-1 Valkey
+# memory ceiling (~30 MB): writes started failing OOM, an unguarded snapshot
+# killed collector.start(), and the retry storm burned the Azure F1 CPU
+# quota into a full worker wedge. The store therefore stays under the
+# ceiling BY POLICY now — the durable layer keeps the hottest slice and the
+# registry note namespace (persistent, upstream) remains the source of
+# truth for everything else:
+#
+#   fri:d:<fp>            per-DID stats; ACTIVE (messages>0) capped at
+#                         KEEP_ACTIVE by last_active, REGISTRY-ONLY capped
+#                         at KEEP_REGISTRY by first_seen (re-derivable via
+#                         the registry self-healing sweep)
+#   fri:idx:active|reg    zset eviction indexes (member=fp, score=epoch)
+#   fri:reg:known|junk    fingerprint sets capped via SPOP trim — the only
+#                         cost of trimming is polite re-fetch churn
+#
+# All values env-tunable so a plan upgrade (or a bigger free tier) lifts the
+# caps without a code change. Eviction order = lowest score first.
+# ---------------------------------------------------------------------------
+
+def _cap_env(name: str, default: int) -> int:
+    try:
+        return max(1000, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+# DIDs with observed messages kept durable (by last_active recency).
+KEEP_ACTIVE = _cap_env("FRI_KEEP_ACTIVE", 25_000)
+# Registry-only identities (zero messages) kept durable + in RAM (by
+# first_seen recency). Older ones live on upstream in /kv/did-* notes and
+# re-enter via the registry sweep's heal budget.
+KEEP_REGISTRY = _cap_env("FRI_KEEP_REGISTRY", 15_000)
+# Registry known-fingerprint set cap (SPOP-trimmed above this).
+KEEP_KNOWN = _cap_env("FRI_KEEP_KNOWN", 180_000)
+# Registry junk-park set cap.
+KEEP_JUNK = _cap_env("FRI_KEEP_JUNK", 40_000)
+# Prune cycle cadence (seconds).
+PRUNE_INTERVAL_S = float(os.environ.get("FRI_PRUNE_INTERVAL_S", 3600))
+# Max known-but-missing identities the registry sweep re-fetches per pass
+# (priority-pinned DIDs heal unconditionally). Bounds CPU/re-fetch churn.
+try:
+    REGISTRY_HEAL_BUDGET = max(0, int(os.environ.get("FRI_REGISTRY_HEAL_BUDGET", 400)))
+except (TypeError, ValueError):
+    REGISTRY_HEAL_BUDGET = 400
 
 # ---------------------------------------------------------------------------
 # TQR score weights (unchanged from v1)
