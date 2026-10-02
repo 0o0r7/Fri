@@ -67,7 +67,19 @@ class DidArchive:
 
     def _uri(self) -> str | None:
         uri = os.environ.get("MONGODB_URI", "").strip()
-        return uri or None
+        if uri:
+            return uri
+        # Operator-dropped credential file: lets the archive tier be
+        # activated with Kudu/SSH access alone (no ARM token needed for
+        # an app-settings write). App Service env vars take precedence.
+        # The file lives on the persistent /home/data share, outside the
+        # read-only package mount, and is never committed anywhere.
+        try:
+            with open("/home/data/fri/mongodb_uri") as f:
+                uri = f.read().strip()
+            return uri or None
+        except OSError:
+            return None
 
     def configured(self) -> bool:
         return self._uri() is not None
