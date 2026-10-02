@@ -566,6 +566,18 @@ class DidIndex:
     def total_dids(self) -> int:
         return max(len(self._dids), self._total_dids_floor)
 
+    @property
+    def searchable_dids(self) -> int:
+        """DIDs actually scan-able by search() right now (honest size).
+
+        total_dids is a floor counter that can exceed the in-RAM index
+        (the free-tier store caps and evicts the durable tail), so a
+        consumer comparing "763k total" against an empty search result
+        was rightly confused. This property is the number search()
+        iterates over; the archive tier covers everything evicted.
+        """
+        return len(self._dids)
+
     def observation_window(self) -> Dict[str, Any]:
         """Time range + volume the current index actually covers.
 

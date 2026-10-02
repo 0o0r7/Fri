@@ -24,6 +24,8 @@ from typing import Any
 
 import httpx
 
+from .archive import archive as did_archive
+from .archive import public_view_from_durable, ArchiveUnavailable
 from collector.config import (
     ALWAYS_POLL_ROOMS,
     DID_PERSIST_INTERVAL_S,
@@ -68,6 +70,10 @@ REDIS_CHANNEL = "fri:events"
 # lowest-scored tail without ever scanning the values themselves.
 IDX_ACTIVE_KEY = "fri:idx:active"
 IDX_REG_KEY = "fri:idx:reg"
+
+# Max fri:d:* entries evicted (after archival) per prune cycle — bounds the
+# mget + Atlas bulk-write burst to a size the shared M0 tier shrugs off.
+ARCHIVE_EVICT_BATCH = 5_000
 
 
 def _env_interval(name: str, default: float) -> float:
@@ -913,8 +919,14 @@ class CollectorLoop:
     async def _prune_once(self) -> dict[str, Any]:
         """One cap-enforcement pass. Never raises (loop-safe).
 
-        - fri:d:<fp> entries: evict the lowest-recency tail via the
-          fri:idx:* zsets (no value scans), protecting operator pins.
+        - fri:d:<fp> entries: ARCHIVE to Atlas (fri.did_archive) then
+          evict the lowest-recency tail via the fri:idx:* zsets (no
+          value scans), protecting operator pins. If the archive write
+          fails, eviction is DEFERRED to the next cycle — pruning must
+          never be the reason a DID becomes unqueryable again (that was
+          the silent-loss bug the archive tier exists to fix). If the
+          archive tier is not configured (no MONGODB_URI), eviction
+          proceeds unarchived exactly as before, by explicit policy.
         - fri:reg:known / fri:reg:junk: SPOP-trim; the only cost of
           trimming is polite re-fetch churn on a later sweep.
         """
@@ -924,6 +936,8 @@ class CollectorLoop:
             "known_trimmed": 0,
             "junk_trimmed": 0,
             "dbsize": None,
+            "archive_ok": None,
+            "archive_deferred": 0,
         }
         try:
             stats["dbsize"] = await self.store.dbsize()
@@ -947,7 +961,19 @@ class CollectorLoop:
                     candidates = [
                         m for m in members if m not in self._protected_fps
                     ][:excess]
+                    # Bound the per-cycle eviction burst: each candidate is
+                    # now an mget + Atlas upsert before delete, and M0 is a
+                    # shared 512MB tier. Hourly cycles x this cap give
+                    # ~120k/day archival throughput — far above churn.
+                    candidates = candidates[:ARCHIVE_EVICT_BATCH]
                     if candidates:
+                        ok = await self._archive_before_evict(candidates, stats)
+                        if not ok:
+                            # Archive write failed — defer the whole batch
+                            # to the next cycle (zset members stay put, so
+                            # nothing is double-processed).
+                            stats["archive_deferred"] += len(candidates)
+                            continue
                         await self.store.delete(
                             [f"{DID_PERSIST_PREFIX}{m}" for m in candidates]
                         )
@@ -978,10 +1004,59 @@ class CollectorLoop:
                 "reg_evicted",
                 "known_trimmed",
                 "junk_trimmed",
+                "archive_deferred",
             )
         ):
             log.info("prune cycle: %s", stats)
         return stats
+
+    async def _archive_before_evict(self, fps: list[str], stats: dict[str, Any]) -> bool:
+        """Best-effort archival of fri:d:* payloads prior to eviction.
+
+        Returns True when eviction may proceed: either the payloads were
+        archived to Atlas, or the archive tier is intentionally disabled
+        (MONGODB_URI unset) and the caller falls back to legacy behavior.
+        Returns False when the archive is configured but the write FAILED
+        — the caller then defers eviction, so a DID is never deleted
+        before its durable copy is safely archived.
+        """
+        if not did_archive.configured():
+            if stats.get("archive_ok") is None:
+                stats["archive_ok"] = False
+                log.info("archive tier not configured — pruning unarchived (legacy)")
+            return True
+        try:
+            keys = [f"{DID_PERSIST_PREFIX}{fp}" for fp in fps]
+            raws = await self.store.mget_raw(keys)
+            docs: list[dict[str, Any]] = []
+            now = _now()
+            for fp, raw in zip(fps, raws):
+                entry: dict[str, Any]
+                if raw:
+                    try:
+                        entry = json.loads(raw)
+                    except Exception:
+                        entry = {}
+                else:
+                    # Key already gone (flush/crash between zset and key):
+                    # still archive the fp so a later fp search at least
+                    # finds the tombstone rather than nothing.
+                    entry = {}
+                entry["evict_source"] = "prune"
+                entry["archived_at"] = now
+                docs.append(public_view_from_durable(fp, entry))
+            if docs:
+                await asyncio.to_thread(did_archive.archive_entries, docs)
+            stats["archive_ok"] = True
+            return True
+        except ArchiveUnavailable as e:
+            stats["archive_ok"] = False
+            log.warning("archive unavailable during prune (deferring eviction): %s", e)
+            return False
+        except Exception as e:
+            stats["archive_ok"] = False
+            log.warning("archive write failed during prune (deferring eviction): %s", e)
+            return False
 
     # ------------------------------------------------------------------
     # Snapshots

@@ -76,6 +76,14 @@ export function AgentCard({
           <span className="inline-flex items-center rounded-full bg-elevated px-2 py-0.5 font-mono text-[10px] text-muted">
             {did.fingerprint.slice(0, 8)}
           </span>
+          {did.archived && (
+            <span
+              className="inline-flex items-center rounded-full border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted"
+              title="Served from the durable archive — this DID aged out of the live free-tier index. Counters are its archived last-known state."
+            >
+              archived
+            </span>
+          )}
         </div>
       </div>
 

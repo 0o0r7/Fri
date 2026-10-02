@@ -12,7 +12,7 @@ import {
 import { filterDids, didIndexStats, type ReputationFilter, type ActivityFilter } from "@/lib/did-filter";
 import { absoluteTime, relativeTime } from "@/lib/format";
 import { useWatchlist } from "@/hooks/useWatchlist";
-import type { DidIndex, DidSortKey, DidStats, ReputationIndex } from "@/lib/types";
+import type { DidIndex, DidSortKey, DidStats, ReputationIndex, SearchMeta } from "@/lib/types";
 
 const SORTS: { id: DidSortKey; label: string }[] = [
   { id: "messages", label: "Messages" },
@@ -58,14 +58,23 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
   // Server-side full-index search: the published snapshot caps per-DID
   // detail at the top-500 by volume, so low-volume or registry-only
   // identities are invisible to a purely client-side filter. Queries of
-  // 4+ chars hit /api/dids?q= which scans EVERY DID ever observed or
-  // registered; shorter queries keep the snappy local filter.
+  // 4+ chars hit /api/dids?q= which scans the LIVE full index and, on a
+  // miss, falls through to the durable Atlas archive tier.
+  //
+  // The UI NEVER silently degrades: every remote answer carries its
+  // provenance (`search` block), fetch failures surface an explicit
+  // banner (with the local top-500 filter clearly labelled as the
+  // fallback), and archived results render an `archived` badge.
   const [remote, setRemote] = useState<DidStats[] | null>(null);
+  const [remoteMeta, setRemoteMeta] = useState<SearchMeta | null>(null);
   const [remoteBusy, setRemoteBusy] = useState(false);
+  const [remoteError, setRemoteError] = useState(false);
   useEffect(() => {
     const q = query.trim();
     if (q.length < 4) {
       setRemote(null);
+      setRemoteMeta(null);
+      setRemoteError(false);
       setRemoteBusy(false);
       return;
     }
@@ -75,10 +84,28 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
       fetch(`/api/dids?q=${encodeURIComponent(q)}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (alive) setRemote(Array.isArray(data?.dids) ? data.dids : []);
+          if (!alive) return;
+          if (data === null) {
+            // Non-200: explicit degraded state, local filter takes over
+            // VISIBLY (banner below) instead of pretending nothing died.
+            setRemote(null);
+            setRemoteMeta(null);
+            setRemoteError(true);
+            return;
+          }
+          setRemoteError(false);
+          setRemoteMeta(
+            data?.search && typeof data.search === "object"
+              ? (data.search as SearchMeta)
+              : { source: "live" },
+          );
+          setRemote(Array.isArray(data?.dids) ? data.dids : []);
         })
         .catch(() => {
-          if (alive) setRemote(null); // offline — fall back to local filter
+          if (!alive) return;
+          setRemote(null); // network offline — same explicit fallback
+          setRemoteMeta(null);
+          setRemoteError(true);
         })
         .finally(() => {
           if (alive) setRemoteBusy(false);
@@ -247,9 +274,22 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
             role="listbox"
             aria-label="DIDs"
           >
+            <SearchStatusBar
+              query={query}
+              busy={remoteBusy}
+              error={remoteError}
+              meta={remoteMeta}
+              usingLocal={remote === null}
+            />
             {dids.length === 0 ? (
               <div className="px-3 py-16 text-center">
-                <p className="font-mono text-sm text-muted">No DIDs match this filter.</p>
+                <p className="font-mono text-sm text-muted">
+                  {remote !== null && remoteMeta && !remoteBusy
+                    ? remoteMeta.source === "archive"
+                      ? "No further matches."
+                      : "No match in the live index or the durable archive."
+                    : "No DIDs match this filter."}
+                </p>
                 <button
                   type="button"
                   className="mt-3 inline-flex h-9 items-center rounded border border-border bg-surface px-3 font-mono text-xs text-muted transition-colors hover:border-accent hover:text-fg"
@@ -401,4 +441,93 @@ function FilterRow<T extends string>({
       ))}
     </div>
   );
+}
+
+/**
+ * SearchStatusBar — honest provenance for DID search (dual-truth antidote).
+ *
+ * Every state the search can be in is EXPLICIT:
+ *   typing/busy  -> "Searching the live index…" (plus archive check note)
+ *   fetch failed -> warning banner; the local top-500 filter is in charge
+ *                   and is NAMED as such, never silently substituted
+ *   archive hit  -> result source labelled, archive size shown
+ *   live hit     -> searchable count shown so 763k-vs-40k confusion
+ *                   (total_dids floor vs scan-able index) can't recur
+ *   no match     -> both tiers explicitly exhausted
+ */
+function SearchStatusBar({
+  query,
+  busy,
+  error,
+  meta,
+  usingLocal,
+}: {
+  query: string;
+  busy: boolean;
+  error: boolean;
+  meta: SearchMeta | null;
+  usingLocal: boolean;
+}) {
+  const q = query.trim();
+  if (q.length < 4) return null;
+
+  if (busy) {
+    return (
+      <p
+        className="mb-2 rounded border border-border bg-surface/60 px-3 py-1.5 font-mono text-[11px] text-muted"
+        role="status"
+        aria-live="polite"
+      >
+        Searching the live index{meta?.searchable_dids ? ` (${meta.searchable_dids.toLocaleString()} searchable entries)` : ""}… then the durable archive on a miss.
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p
+        className="mb-2 rounded border border-low/40 bg-low/10 px-3 py-1.5 font-mono text-[11px] text-low"
+        role="alert"
+      >
+        Live search unreachable — showing the local snapshot filter (top 500 only). Retry by editing the query.
+      </p>
+    );
+  }
+
+  if (meta?.source === "archive") {
+    return (
+      <p
+        className="mb-2 rounded border border-border bg-surface/60 px-3 py-1.5 font-mono text-[11px] text-muted"
+        role="status"
+      >
+        Not in the live index — found in the durable archive{meta.archive_dids != null ? ` (${meta.archive_dids.toLocaleString()} archived DIDs)` : ""}. Counters are last-known archived state.
+      </p>
+    );
+  }
+
+  if (meta?.source === "snapshot" || (usingLocal && !meta)) {
+    return (
+      <p className="mb-2 rounded border border-border bg-surface/60 px-3 py-1.5 font-mono text-[11px] text-muted" role="status">
+        Search service warming up — results from the local snapshot (top 500 only).
+      </p>
+    );
+  }
+
+  if (meta?.archive_error) {
+    return (
+      <p className="mb-2 rounded border border-border bg-surface/60 px-3 py-1.5 font-mono text-[11px] text-muted" role="status">
+        Archive tier unreachable ({meta.archive_error}) — live-index and snapshot results only.
+      </p>
+    );
+  }
+
+  if (meta?.source === "live") {
+    return (
+      <p className="mb-2 px-3 py-1 font-mono text-[11px] text-faint" role="status">
+        Matched in the live index{meta.searchable_dids != null ? ` — ${meta.searchable_dids.toLocaleString()} entries scanned` : ""}.
+      </p>
+    );
+  }
+
+  return null;
 }

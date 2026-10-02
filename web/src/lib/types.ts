@@ -76,6 +76,21 @@ export type DidStats = {
    * published a persistent did-note (survives room-ring churn). */
   profile_bio?: string;
   identity_note?: boolean;
+  /** Archive-tier marker (API v1.3+) — true when this entry was
+   * served from the durable Atlas archive (the DID aged out of the
+   * free-tier live index caps). Rendered as a distinct badge so an
+   * archived result can never masquerade as a live one. */
+  archived?: boolean;
+};
+
+/** Provenance block returned by /api/dids?q= (API v1.3+) — the
+ * dual-truth antidote: every search answer states WHERE it came from
+ * and HOW MUCH the live index can actually scan. */
+export type SearchMeta = {
+  source: "live" | "archive" | "snapshot" | "none";
+  searchable_dids?: number | null;
+  archive_dids?: number | null;
+  archive_error?: string | null;
 };
 
 export type DidIndex = {

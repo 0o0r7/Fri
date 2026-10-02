@@ -27,6 +27,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from collector.reputation import SCHEMA_VERSION, ReputationScorer
 
 from .collector import MONITORED_ROOMS, REDIS_CHANNEL, CollectorLoop
+from .archive import archive as did_archive, ArchiveUnavailable
 from .eventbus import EventBus
 from .store import Store
 
@@ -191,6 +192,19 @@ async def lifespan(app: FastAPI):
     app.state.collector_ready = False
     log.info("Event bus mode: %s", EVENT_BUS_MODE)
 
+    if did_archive.configured():
+        # Warm the Atlas connection OUT of band so /api/health (the
+        # freshness probe — uptime monitors watch it) never pays the
+        # first-connect server-selection timeout. Failure here only
+        # disables the archive tier; the API answers without it.
+        async def _warm_archive() -> None:
+            try:
+                await asyncio.to_thread(did_archive.count, True)
+                log.info("archive tier warmed (count=%s)", did_archive.count())
+            except Exception as e:
+                log.warning("archive tier warm-up failed (tier disabled this boot): %s", e)
+        asyncio.create_task(_warm_archive())
+
     try:
         # Fast pre-check so a dead Redis fails in <1s instead of after the
         # whole technocore HTTP warm-up inside collector.start().
@@ -312,6 +326,20 @@ def _health_verdict(payload: dict, ready: bool, collector, store) -> dict:
             out["loops"] = {t.get_name(): (not t.done()) for t in loops}
         out["loop_failures"] = dict(getattr(collector, "_loop_failures", {}))
         out["prune"] = getattr(collector, "prune_stats", None) or None
+        # Honest search capacity: searchable_dids is what /api/dids?q=
+        # can actually scan in RAM; total_dids additionally counts the
+        # durable floor. Archive tier size is reported when configured.
+        try:
+            out["did_index"] = {
+                "searchable_dids": collector.did_index.searchable_dids,
+                "total_dids": collector.did_index.total_dids,
+                "archive_dids": (
+                    did_archive.count() if did_archive.configured() else None
+                ),
+                "archive_configured": did_archive.configured(),
+            }
+        except Exception:
+            pass
         errors = getattr(store, "errors", None)
         if errors is not None:
             out["store_errors"] = errors
@@ -373,18 +401,64 @@ async def rooms():
 
 @app.get("/api/dids")
 async def dids(q: str | None = None):
-    """DID index snapshot — or a full-index search when `q` is present.
+    """DID index snapshot — or a full-index + archive search when `q` is set.
 
     The published snapshot caps per-DID detail at the top-500 by volume;
     a low-volume or registry-only DID would be unfindable through it.
-    With ?q= the query runs against the LIVE full index (every DID ever
-    observed or registered — substring match on the did string and the
-    16-hex fingerprint), so "every DID stays queryable" actually holds.
+    With ?q= the query runs against the LIVE full index (case-insensitive
+    substring on the did string and the 16-hex fingerprint). When the
+    live index has no match, the query falls through to the ATLAS
+    ARCHIVE tier (fri.did_archive — where pruned/evicted entries are
+    durably archived), so DIDs that aged out of the free-tier store
+    caps stay queryable. Every answer now carries a `search` block:
+
+        source          "live" | "archive" | "snapshot" | "none"
+        searchable_dids entries actually scan-able in RAM (honest size
+                        of the live index — total_dids is a floor
+                        counter that can exceed it)
+        archive_dids    estimated archive tier size (null = disabled)
+
+    A failed archive lookup is reported as source "error"-adjacent
+    fields (archive_error), never swallowed into a silent empty.
     """
     if q and q.strip():
         collector = getattr(app.state, "collector", None)
         if collector is not None and getattr(app.state, "collector_ready", False):
             matches = collector.did_index.search(q, limit=500)
+            searchable = collector.did_index.searchable_dids
+            if matches:
+                return {
+                    "version": "1.2",
+                    "generated_at": _now(),
+                    "source": BASE_URL,
+                    "query": q.strip(),
+                    "total_dids": collector.did_index.total_dids,
+                    "total_messages_sampled": collector.did_index._total_messages_sampled,
+                    "search": _search_block("live", searchable),
+                    "dids": [s.to_dict() for s in matches],
+                }
+            # Live miss — check the durable archive tier before answering
+            # "empty" (pruned DIDs live here now).
+            archive_hits: list[dict] = []
+            archive_error: str | None = None
+            if did_archive.configured():
+                try:
+                    archive_hits = await asyncio.to_thread(did_archive.search, q, 50)
+                except ArchiveUnavailable as e:
+                    archive_error = str(e)
+                except Exception as e:  # never let the fallback 500
+                    archive_error = f"archive lookup failed: {type(e).__name__}"
+            if archive_hits:
+                return {
+                    "version": "1.2",
+                    "generated_at": _now(),
+                    "source": BASE_URL,
+                    "query": q.strip(),
+                    "total_dids": collector.did_index.total_dids,
+                    "total_messages_sampled": collector.did_index._total_messages_sampled,
+                    "search": _search_block("archive", searchable, archive_error),
+                    "dids": archive_hits,
+                }
             return {
                 "version": "1.2",
                 "generated_at": _now(),
@@ -392,7 +466,8 @@ async def dids(q: str | None = None):
                 "query": q.strip(),
                 "total_dids": collector.did_index.total_dids,
                 "total_messages_sampled": collector.did_index._total_messages_sampled,
-                "dids": [s.to_dict() for s in matches],
+                "search": _search_block("none", searchable, archive_error),
+                "dids": [],
             }
         # Collector not ready — best-effort filter over the cached view.
         payload = await app.state.store.get("fri:dids") or {"dids": []}
@@ -400,6 +475,7 @@ async def dids(q: str | None = None):
         payload = {
             **payload,
             "query": needle,
+            "search": _search_block("snapshot", None),
             "dids": [
                 d for d in payload.get("dids", [])
                 if isinstance(d, dict) and needle in (d.get("did") or "").lower()
@@ -407,6 +483,22 @@ async def dids(q: str | None = None):
         }
         return payload
     return await app.state.store.get("fri:dids") or {"dids": []}
+
+
+def _search_block(kind: str, searchable: int | None, archive_error: str | None = None) -> dict:
+    """Honest search-provenance block (dual-truth antidote)."""
+    archive_count: int | None = None
+    if did_archive.configured():
+        try:
+            archive_count = did_archive.count()
+        except Exception:
+            archive_count = None
+    return {
+        "source": kind,
+        "searchable_dids": searchable,
+        "archive_dids": archive_count,
+        "archive_error": archive_error,
+    }
 
 
 @app.get("/api/kibble")
@@ -490,7 +582,18 @@ async def meta():
                 "fri:reg:priority set, bootstrapped from FRI_PRIORITY_DIDS) "
                 "are reconciled FIRST on every pass, so pinned DIDs come "
                 "back within seconds of a restart even while the full "
-                "1M+-note ledger is still being walked."
+                "1M+-note ledger is still being walked. "
+                "The durable store is size-capped on the free tier, so "
+                "the lowest-recency tail is evicted on a schedule — but "
+                "eviction now ARCHIVES every entry to the Atlas archive "
+                "tier (fri.did_archive) BEFORE deletion, and /api/dids?q= "
+                "falls back to that archive when the live index has no "
+                "match. Search answers carry a `search` block with the "
+                "exact source (live / archive / snapshot) and the honest "
+                "searchable_dids count, so an archived result can always "
+                "be told apart from a live one. Known limitation: DIDs "
+                "evicted before the archive tier existed (pre-2026-10) "
+                "are recoverable only from committed snapshot history."
             ),
             "hydration_overlap": (
                 "On boot the collector re-hydrates from the committed "
