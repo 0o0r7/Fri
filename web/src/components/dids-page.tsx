@@ -280,6 +280,7 @@ export function DidsPage({ index, reputationIndex }: { index: DidIndex; reputati
               error={remoteError}
               meta={remoteMeta}
               usingLocal={remote === null}
+              hasResults={dids.length > 0}
             />
             {dids.length === 0 ? (
               <div className="px-3 py-16 text-center">
@@ -461,12 +462,14 @@ function SearchStatusBar({
   error,
   meta,
   usingLocal,
+  hasResults,
 }: {
   query: string;
   busy: boolean;
   error: boolean;
   meta: SearchMeta | null;
   usingLocal: boolean;
+  hasResults: boolean;
 }) {
   const q = query.trim();
   if (q.length < 4) return null;
@@ -522,6 +525,10 @@ function SearchStatusBar({
   }
 
   if (meta?.source === "live") {
+    // Silent on an empty live result — the empty-state copy below the
+    // grid already states both tiers were checked; a "matched" banner
+    // above "no match" would be a contradiction.
+    if (!hasResults) return null;
     return (
       <p className="mb-2 px-3 py-1 font-mono text-[11px] text-faint" role="status">
         Matched in the live index{meta.searchable_dids != null ? ` — ${meta.searchable_dids.toLocaleString()} entries scanned` : ""}.
