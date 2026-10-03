@@ -71,9 +71,21 @@ REDIS_CHANNEL = "fri:events"
 IDX_ACTIVE_KEY = "fri:idx:active"
 IDX_REG_KEY = "fri:idx:reg"
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return int(default)
+
+
 # Max fri:d:* entries evicted (after archival) per prune cycle — bounds the
 # mget + Atlas bulk-write burst to a size the shared M0 tier shrugs off.
-ARCHIVE_EVICT_BATCH = 5_000
+# Env-tunable (FRI_ARCHIVE_EVICT_BATCH). History: the 2026-10-02 boot reseed
+# the full observed universe (~573k DIDs) while the old 5k/hour drain needed
+# ~4.6 days at the memory ceiling — that is the Aiven "running low on memory"
+# alert of 2026-10-03. 100k/hour converges in ~6h; Atlas M0 sees ~14 bulk
+# upserts/s sustained (500-doc batches), far under its capacity.
+ARCHIVE_EVICT_BATCH = _env_int("FRI_ARCHIVE_EVICT_BATCH", 100_000)
 
 
 def _env_interval(name: str, default: float) -> float:
@@ -956,15 +968,19 @@ class CollectorLoop:
                     # members must not consume cap slots, so the window
                     # reaches past them and `excess` NON-protected members
                     # are evicted (exact convergence, pins never touched).
-                    window = min(excess + len(self._protected_fps), 50_000)
+                    # Window must reach past the pinned fps so `excess`
+                    # NON-protected members are always reachable; never
+                    # larger than what this cycle will actually evict.
+                    window = len(self._protected_fps) + min(excess, ARCHIVE_EVICT_BATCH)
                     members = await self.store.zrange(idx_key, 0, window - 1)
                     candidates = [
                         m for m in members if m not in self._protected_fps
                     ][:excess]
                     # Bound the per-cycle eviction burst: each candidate is
-                    # now an mget + Atlas upsert before delete, and M0 is a
+                    # an mget + Atlas upsert before delete, and M0 is a
                     # shared 512MB tier. Hourly cycles x this cap give
-                    # ~120k/day archival throughput — far above churn.
+                    # ~2.4M/day archival throughput — far above churn and
+                    # fast enough to out-drain a full boot reseed.
                     candidates = candidates[:ARCHIVE_EVICT_BATCH]
                     if candidates:
                         ok = await self._archive_before_evict(candidates, stats)
