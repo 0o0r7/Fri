@@ -950,6 +950,7 @@ class CollectorLoop:
             "dbsize": None,
             "archive_ok": None,
             "archive_deferred": 0,
+            "tombstones_skipped": 0,
         }
         try:
             stats["dbsize"] = await self.store.dbsize()
@@ -990,10 +991,17 @@ class CollectorLoop:
                             # nothing is double-processed).
                             stats["archive_deferred"] += len(candidates)
                             continue
+                        # zrem BEFORE delete: a crash between the two then
+                        # strands a durable payload WITHOUT zset membership
+                        # (harmless — boot rehydration re-indexes orphan
+                        # payloads and re-zadds them), while the reverse
+                        # order strands zset members WITHOUT payloads, and
+                        # every later cycle minted a tombstone husk per
+                        # stranded fp — the INC-2026-10-10 archive flood.
+                        await self.store.zrem(idx_key, candidates)
                         await self.store.delete(
                             [f"{DID_PERSIST_PREFIX}{m}" for m in candidates]
                         )
-                        await self.store.zrem(idx_key, candidates)
                         stats[f"{kind}_evicted"] = len(candidates)
             except Exception as e:
                 log.warning("prune %s failed: %s", kind, e)
@@ -1021,6 +1029,7 @@ class CollectorLoop:
                 "known_trimmed",
                 "junk_trimmed",
                 "archive_deferred",
+                "tombstones_skipped",
             )
         ):
             log.info("prune cycle: %s", stats)
@@ -1054,10 +1063,21 @@ class CollectorLoop:
                     except Exception:
                         entry = {}
                 else:
-                    # Key already gone (flush/crash between zset and key):
-                    # still archive the fp so a later fp search at least
-                    # finds the tombstone rather than nothing.
                     entry = {}
+                if not entry.get("did"):
+                    # No DID in the payload (key already gone between zset
+                    # and key, corrupt JSON, or an fp that was never
+                    # resolved to a DID). Archiving an all-zero husk here
+                    # answers no search the product promises — a bare
+                    # fingerprint renders an empty identity card — and it
+                    # is pure logical-size waste: under the Oct 2026 OOM
+                    # regime this tombstone policy flooded the M0 archive
+                    # with 827k did-null docs (~345MB of the 482MB that
+                    # tripped INC-2026-10-10). Skip: eviction proceeds,
+                    # nothing durable is lost (there was nothing durable
+                    # to lose).
+                    stats["tombstones_skipped"] = stats.get("tombstones_skipped", 0) + 1
+                    continue
                 entry["evict_source"] = "prune"
                 entry["archived_at"] = now
                 docs.append(public_view_from_durable(fp, entry))
