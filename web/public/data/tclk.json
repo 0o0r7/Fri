@@ -1,45 +1,49 @@
 {
   "version": "1.0",
-  "generated_at": "2026-10-20T06:17:19Z",
+  "generated_at": "2026-10-20T08:14:02Z",
   "source": "https://technocore.chat",
   "protocol_version": "tclk1",
   "spec_url": "https://github.com/flop-labs/tclk/blob/main/SPEC.md",
-  "total_contracts": 64,
-  "total_frames": 207,
-  "total_messages_sampled": 2716,
+  "total_contracts": 68,
+  "total_frames": 222,
+  "total_messages_sampled": 2805,
   "parse_failures": 0,
   "frames_by_type": {
-    "lock": 6,
-    "offer": 14,
-    "receipt": 0,
-    "cancel": 0,
-    "accept": 169,
+    "lock": 8,
     "heartbeat": 0,
-    "reveal": 5,
+    "cancel": 0,
+    "offer": 28,
     "refund": 0,
-    "unknown": 13
+    "accept": 171,
+    "receipt": 3,
+    "reveal": 12,
+    "unknown": 0
   },
   "contracts_by_state": {
-    "proposed": 14,
-    "accepted": 44,
-    "revealed": 5,
-    "locked": 1
+    "proposed": 28,
+    "accepted": 25,
+    "revealed": 9,
+    "claimed": 3,
+    "locked": 3
   },
   "contracts_by_rail": {
-    "paper": 49,
-    "flop-htlc": 3
+    "paper": 59,
+    "flop-htlc": 5,
+    "x402": 2
   },
   "contracts_by_asset": {
-    "PAPER": 46,
-    "FLOP": 3
+    "PAPER": 28,
+    "FLOP": 31
   },
-  "receipts_by_outcome": {},
+  "receipts_by_outcome": {
+    "claimed": 3
+  },
   "contracts": [
     {
-      "contract_id": "0x6a237952ec6c22058f81d2f5a5d687fb6514595cd6a8ea56b21420b60b183029",
-      "state": "locked",
-      "payer_did": "did:key:z6Mkmh7pXJyxQRidRxVd41rE2RfAUG5Yq2DmNvUBfcoikBXL",
-      "payee_did": "did:key:z6Mkujo2vVfrb49wcJ7wP7ajrZumjkLmBzhbMSVpRkcvPYuJ",
+      "contract_id": "0x347c3d803e3e2f4808e8af8bffd38bbbd3883ada4d9880f8783f1bd88bd62ea5",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkpAF6uyhZpGSZTPDB2bVi389jS78menWpeGFbvPAyY5GU",
+      "payee_did": "did:key:z6MkmRZ1JZg4t5S8rVyRXyDPVTLS5BuncgZ6gDtw6aaTxkfC",
       "amount": "1000000",
       "asset": "PAPER",
       "rails": [
@@ -47,98 +51,48 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "demo-984ec483",
+        "id": "demo-831a5bb3",
         "proto": "a2a"
       },
-      "offer_ts": "2026-10-20T06:15:26.032922Z",
-      "accept_ts": "2026-10-20T06:15:26.832267Z",
-      "lock_count": 1,
+      "offer_ts": "2026-10-20T08:13:14.808642Z",
+      "accept_ts": "2026-10-20T08:13:15.866298Z",
+      "lock_count": 0,
       "reveal_count": 0,
       "refund_count": 0,
       "cancel_count": 0,
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:26.832267Z",
-      "last_activity": "2026-10-20T06:16:29.990710Z",
+      "first_seen": "2026-10-20T08:13:15.866298Z",
+      "last_activity": "2026-10-20T08:13:15.866298Z",
       "offer_frame": {
         "amount": "1000000",
         "asset": "PAPER",
-        "claimByMs": 1792478727040,
-        "expiresMs": 1792477527040,
-        "from": "did:key:z6Mkmh7pXJyxQRidRxVd41rE2RfAUG5Yq2DmNvUBfcoikBXL",
-        "id": "0x02796628b9f273d113c2885e82a91ac27f5182b127b6ecdbc5e11c16efd1b214",
+        "claimByMs": 1792485793195,
+        "expiresMs": 1792484593195,
+        "from": "did:key:z6MkpAF6uyhZpGSZTPDB2bVi389jS78menWpeGFbvPAyY5GU",
+        "id": "0xee6383a3da7631b9c070c9a126d5e7f317e4ed124f0c2969431e419c9c4cedb4",
         "job": {
-          "id": "demo-984ec483",
+          "id": "demo-831a5bb3",
           "proto": "a2a"
         },
         "lock": "hash",
-        "nonce": "ad4bab45f4171183",
+        "nonce": "3b693e990c5c684a",
         "rails": [
           "paper"
         ],
-        "refundAfterMs": 1792480527040,
+        "refundAfterMs": 1792487593195,
         "role": "payer",
         "type": "offer",
-        "_ts": "2026-10-20T06:15:26.032922Z",
-        "_seq": 23302568,
+        "_ts": "2026-10-20T08:13:14.808642Z",
+        "_seq": 23317869,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0x4f783fd13bfb5f535ebff8b67407e0d91986a6c8a66d0a7288f2097ffd1dca40",
-      "state": "revealed",
-      "payer_did": "did:key:z6Mkj9gKMf2hf6DgihyNXaXiXof92TagjzumXpaGB4DHJFtY",
-      "payee_did": "did:key:z6MktWt29TsHqnCtBPPinrFRgERfBw6hWXTYFen45MiUo252",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-690b990c",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:19.835390Z",
-      "accept_ts": "2026-10-20T06:15:21.446472Z",
-      "lock_count": 1,
-      "reveal_count": 1,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:21.446472Z",
-      "last_activity": "2026-10-20T06:16:28.776921Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478721070,
-        "expiresMs": 1792477521070,
-        "from": "did:key:z6Mkj9gKMf2hf6DgihyNXaXiXof92TagjzumXpaGB4DHJFtY",
-        "id": "0xfb942edf398221161c6c02fc8ce365a4d3d75b525aaa2e4d5234963c10999da7",
-        "job": {
-          "id": "demo-690b990c",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "a41165b5aedd5187",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480521070,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:19.835390Z",
-        "_seq": 23302561,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x24c1b58d064fe76bb205a1602acc92a60fa03841f1112207081667db11c2796a",
+      "contract_id": "0x51da451d9993fe3fac763b43eddf55534b3f68c11799daf6b28b33cfe0a6dcd8",
       "state": "accepted",
-      "payer_did": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
+      "payer_did": "did:key:z6MkpAF6uyhZpGSZTPDB2bVi389jS78menWpeGFbvPAyY5GU",
       "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
       "amount": "1000000",
       "asset": "PAPER",
@@ -147,11 +101,11 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "demo-229c6c20",
+        "id": "demo-831a5bb3",
         "proto": "a2a"
       },
-      "offer_ts": "2026-10-20T06:16:20.814752Z",
-      "accept_ts": "2026-10-20T06:16:22.040542Z",
+      "offer_ts": "2026-10-20T08:13:14.808642Z",
+      "accept_ts": "2026-10-20T08:13:15.135623Z",
       "lock_count": 0,
       "reveal_count": 0,
       "refund_count": 0,
@@ -159,186 +113,36 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:22.040542Z",
-      "last_activity": "2026-10-20T06:16:22.040542Z",
+      "first_seen": "2026-10-20T08:13:15.135623Z",
+      "last_activity": "2026-10-20T08:13:15.135623Z",
       "offer_frame": {
         "amount": "1000000",
         "asset": "PAPER",
-        "claimByMs": 1792478782083,
-        "expiresMs": 1792477582083,
-        "from": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
-        "id": "0xde12dff35b4572bf864c80aaf47e623f490339f08b809d0aae312f726b7f0330",
+        "claimByMs": 1792485793195,
+        "expiresMs": 1792484593195,
+        "from": "did:key:z6MkpAF6uyhZpGSZTPDB2bVi389jS78menWpeGFbvPAyY5GU",
+        "id": "0xee6383a3da7631b9c070c9a126d5e7f317e4ed124f0c2969431e419c9c4cedb4",
         "job": {
-          "id": "demo-229c6c20",
+          "id": "demo-831a5bb3",
           "proto": "a2a"
         },
         "lock": "hash",
-        "nonce": "335a875e8a8bef02",
+        "nonce": "3b693e990c5c684a",
         "rails": [
           "paper"
         ],
-        "refundAfterMs": 1792480582083,
+        "refundAfterMs": 1792487593195,
         "role": "payer",
         "type": "offer",
-        "_ts": "2026-10-20T06:16:20.814752Z",
-        "_seq": 23302738,
+        "_ts": "2026-10-20T08:13:14.808642Z",
+        "_seq": 23317869,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0xd9f36497332bc685d002c46ba3bca99b925b12cfb1e03ee8ffd075cf1fac93ac",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
-      "payee_did": "did:key:z6MkrXV4q4m959VmxMhhMVzrLS8YSXGjzx1uq9T9rqKc8sNw",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-229c6c20",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:20.814752Z",
-      "accept_ts": "2026-10-20T06:16:21.586007Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:21.586007Z",
-      "last_activity": "2026-10-20T06:16:21.586007Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478782083,
-        "expiresMs": 1792477582083,
-        "from": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
-        "id": "0xde12dff35b4572bf864c80aaf47e623f490339f08b809d0aae312f726b7f0330",
-        "job": {
-          "id": "demo-229c6c20",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "335a875e8a8bef02",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480582083,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:20.814752Z",
-        "_seq": 23302738,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xa9341f24cc44b41690c4e56f30791d71e52045f9a49ebd5e6c3f4d8c242df7a0",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
-      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-229c6c20",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:20.814752Z",
-      "accept_ts": "2026-10-20T06:16:21.460658Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:21.460658Z",
-      "last_activity": "2026-10-20T06:16:21.460658Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478782083,
-        "expiresMs": 1792477582083,
-        "from": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
-        "id": "0xde12dff35b4572bf864c80aaf47e623f490339f08b809d0aae312f726b7f0330",
-        "job": {
-          "id": "demo-229c6c20",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "335a875e8a8bef02",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480582083,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:20.814752Z",
-        "_seq": 23302738,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xc4ca650acb9ba3345780fc8e056a2aead79fda420028675a968f542ff7dbed5b",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-      "payee_did": "did:key:z6MkjEZ8J4VQWN1pSdq1X34Qv5FuAvaDWxQquQRU6JuhLdEH",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-38446e7e",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:20.375470Z",
-      "accept_ts": "2026-10-20T06:16:21.158773Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:21.158773Z",
-      "last_activity": "2026-10-20T06:16:21.158773Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478780874,
-        "expiresMs": 1792477580874,
-        "from": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-        "id": "0x4dffe9de0b7aa0b36a4ac1251c1a479f18e07ec60f9e4d313a22f9b67f9121d3",
-        "job": {
-          "id": "demo-38446e7e",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "cc122508d3228a46",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480580874,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:20.375470Z",
-        "_seq": 23302735,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xde12dff35b4572bf864c80aaf47e623f490339f08b809d0aae312f726b7f0330",
+      "contract_id": "0xee6383a3da7631b9c070c9a126d5e7f317e4ed124f0c2969431e419c9c4cedb4",
       "state": "proposed",
-      "payer_did": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
+      "payer_did": "did:key:z6MkpAF6uyhZpGSZTPDB2bVi389jS78menWpeGFbvPAyY5GU",
       "payee_did": null,
       "amount": "1000000",
       "asset": "PAPER",
@@ -347,10 +151,10 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "demo-229c6c20",
+        "id": "demo-831a5bb3",
         "proto": "a2a"
       },
-      "offer_ts": "2026-10-20T06:16:20.814752Z",
+      "offer_ts": "2026-10-20T08:13:14.808642Z",
       "accept_ts": null,
       "lock_count": 0,
       "reveal_count": 0,
@@ -359,2158 +163,37 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:20.814752Z",
-      "last_activity": "2026-10-20T06:16:20.814752Z",
+      "first_seen": "2026-10-20T08:13:14.808642Z",
+      "last_activity": "2026-10-20T08:13:14.808642Z",
       "offer_frame": {
         "amount": "1000000",
         "asset": "PAPER",
-        "claimByMs": 1792478782083,
-        "expiresMs": 1792477582083,
-        "from": "did:key:z6MkiGB2TF1nY5yBvfKTkefqBZ92pXoWg5qQn9BHZsdGRDsQ",
-        "id": "0xde12dff35b4572bf864c80aaf47e623f490339f08b809d0aae312f726b7f0330",
+        "claimByMs": 1792485793195,
+        "expiresMs": 1792484593195,
+        "from": "did:key:z6MkpAF6uyhZpGSZTPDB2bVi389jS78menWpeGFbvPAyY5GU",
+        "id": "0xee6383a3da7631b9c070c9a126d5e7f317e4ed124f0c2969431e419c9c4cedb4",
         "job": {
-          "id": "demo-229c6c20",
+          "id": "demo-831a5bb3",
           "proto": "a2a"
         },
         "lock": "hash",
-        "nonce": "335a875e8a8bef02",
+        "nonce": "3b693e990c5c684a",
         "rails": [
           "paper"
         ],
-        "refundAfterMs": 1792480582083,
+        "refundAfterMs": 1792487593195,
         "role": "payer",
         "type": "offer",
-        "_ts": "2026-10-20T06:16:20.814752Z",
-        "_seq": 23302738,
+        "_ts": "2026-10-20T08:13:14.808642Z",
+        "_seq": 23317869,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0x99e6637dfbdb0d1bcad0ae1f11b3302ba8c531d5d97797a138d54eb77323c340",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-38446e7e",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:20.375470Z",
-      "accept_ts": "2026-10-20T06:16:20.723715Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:20.723715Z",
-      "last_activity": "2026-10-20T06:16:20.723715Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478780874,
-        "expiresMs": 1792477580874,
-        "from": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-        "id": "0x4dffe9de0b7aa0b36a4ac1251c1a479f18e07ec60f9e4d313a22f9b67f9121d3",
-        "job": {
-          "id": "demo-38446e7e",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "cc122508d3228a46",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480580874,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:20.375470Z",
-        "_seq": 23302735,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x2b54862cd0dc88744f0f34092a675a1ba5398fa205f7baa7f9efc32d049addf1",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-38446e7e",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:20.375470Z",
-      "accept_ts": "2026-10-20T06:16:20.654771Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:20.654771Z",
-      "last_activity": "2026-10-20T06:16:20.654771Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478780874,
-        "expiresMs": 1792477580874,
-        "from": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-        "id": "0x4dffe9de0b7aa0b36a4ac1251c1a479f18e07ec60f9e4d313a22f9b67f9121d3",
-        "job": {
-          "id": "demo-38446e7e",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "cc122508d3228a46",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480580874,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:20.375470Z",
-        "_seq": 23302735,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x4dffe9de0b7aa0b36a4ac1251c1a479f18e07ec60f9e4d313a22f9b67f9121d3",
-      "state": "proposed",
-      "payer_did": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-      "payee_did": null,
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-38446e7e",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:20.375470Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:20.375470Z",
-      "last_activity": "2026-10-20T06:16:20.375470Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478780874,
-        "expiresMs": 1792477580874,
-        "from": "did:key:z6MkgZGcWP69dsRtm2aiiEP4AYGD5xHFMhecnNC3aCKbPdqD",
-        "id": "0x4dffe9de0b7aa0b36a4ac1251c1a479f18e07ec60f9e4d313a22f9b67f9121d3",
-        "job": {
-          "id": "demo-38446e7e",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "cc122508d3228a46",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480580874,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:20.375470Z",
-        "_seq": 23302735,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xbf329d03b3795797dcb7ca38e41bdde53430e7f0c2e06b113c4088850a4c640f",
-      "state": "revealed",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": null,
-      "lock_count": 1,
-      "reveal_count": 1,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:11.400841Z",
-      "last_activity": "2026-10-20T06:16:16.442211Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0xe03e55de57b73e7e3a267cd4110634e2751afcab573f3fa1c335e05d9e7eefdb",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-      "payee_did": "did:key:z6MkkHxtVzKS9vamVBhmecGvBiiDM4FQhCDqZLv3AsFpTB4N",
-      "amount": "3000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-da/deal-88f1f3da",
-        "id": "deal-88f1f3da",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:12.178119Z",
-      "accept_ts": "2026-10-20T06:16:13.415918Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:13.415918Z",
-      "last_activity": "2026-10-20T06:16:13.415918Z",
-      "offer_frame": {
-        "amount": "3000000",
-        "asset": "PAPER",
-        "claimByMs": 1792995367304,
-        "expiresMs": 1792563367304,
-        "from": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-        "id": "0x7158a9c5c0b0c6d362f2ad0ed9a3b18ec00de1be811e7daa0fd8fee979f478ed",
-        "job": {
-          "context": "/kv/tclk-job-da/deal-88f1f3da",
-          "id": "deal-88f1f3da",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "76c31ecf5870f111",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168167304,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:12.178119Z",
-        "_seq": 23302708,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x48527097081c31292d90cfac18ffb5c6ebbf5147f3a475f7f9f5944be644ff3d",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "3000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-da/deal-88f1f3da",
-        "id": "deal-88f1f3da",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:12.178119Z",
-      "accept_ts": "2026-10-20T06:16:12.957911Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:12.957911Z",
-      "last_activity": "2026-10-20T06:16:12.957911Z",
-      "offer_frame": {
-        "amount": "3000000",
-        "asset": "PAPER",
-        "claimByMs": 1792995367304,
-        "expiresMs": 1792563367304,
-        "from": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-        "id": "0x7158a9c5c0b0c6d362f2ad0ed9a3b18ec00de1be811e7daa0fd8fee979f478ed",
-        "job": {
-          "context": "/kv/tclk-job-da/deal-88f1f3da",
-          "id": "deal-88f1f3da",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "76c31ecf5870f111",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168167304,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:12.178119Z",
-        "_seq": 23302708,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x851afe86f718b71b516d070603e04aa882690eec82366f08c8309f6d173ba5a1",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-      "payee_did": "did:key:z6MkrCKGxMba32x3Jawc5uRUzePvxfnz1spRQE89CoAniULA",
-      "amount": "3000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-da/deal-88f1f3da",
-        "id": "deal-88f1f3da",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:12.178119Z",
-      "accept_ts": "2026-10-20T06:16:12.892875Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:12.892875Z",
-      "last_activity": "2026-10-20T06:16:12.892875Z",
-      "offer_frame": {
-        "amount": "3000000",
-        "asset": "PAPER",
-        "claimByMs": 1792995367304,
-        "expiresMs": 1792563367304,
-        "from": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-        "id": "0x7158a9c5c0b0c6d362f2ad0ed9a3b18ec00de1be811e7daa0fd8fee979f478ed",
-        "job": {
-          "context": "/kv/tclk-job-da/deal-88f1f3da",
-          "id": "deal-88f1f3da",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "76c31ecf5870f111",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168167304,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:12.178119Z",
-        "_seq": 23302708,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x7158a9c5c0b0c6d362f2ad0ed9a3b18ec00de1be811e7daa0fd8fee979f478ed",
-      "state": "proposed",
-      "payer_did": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-      "payee_did": null,
-      "amount": "3000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-da/deal-88f1f3da",
-        "id": "deal-88f1f3da",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:12.178119Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:12.178119Z",
-      "last_activity": "2026-10-20T06:16:12.178119Z",
-      "offer_frame": {
-        "amount": "3000000",
-        "asset": "PAPER",
-        "claimByMs": 1792995367304,
-        "expiresMs": 1792563367304,
-        "from": "did:key:z6MkvnbxCvsuk1mGNaBLzsdcN7EFSobtn4vi9FW8iWUyJ3Se",
-        "id": "0x7158a9c5c0b0c6d362f2ad0ed9a3b18ec00de1be811e7daa0fd8fee979f478ed",
-        "job": {
-          "context": "/kv/tclk-job-da/deal-88f1f3da",
-          "id": "deal-88f1f3da",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "76c31ecf5870f111",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168167304,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:12.178119Z",
-        "_seq": 23302708,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x0e3ea7f23a95df129a472abaca4beaef30f00d1859061e7c6283715f0032786a",
-      "state": "revealed",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": null,
-      "lock_count": 1,
-      "reveal_count": 1,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:04.813542Z",
-      "last_activity": "2026-10-20T06:16:07.986455Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x1c562c764f87990f719610ca465ab53d663088f6a2d469bd3d78a45528068bd6",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkuwTxRT2jAcrg35muXkVU1fg3drYQQQ1LXtf7XNFwANYq",
-      "payee_did": "did:key:z6MkkHxtVzKS9vamVBhmecGvBiiDM4FQhCDqZLv3AsFpTB4N",
-      "amount": "1",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-40/didscape-5312d",
-        "id": "didscape-5312de70f91dbf40",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:05.804492Z",
-      "accept_ts": "2026-10-20T06:16:06.973743Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:06.973743Z",
-      "last_activity": "2026-10-20T06:16:06.973743Z",
-      "offer_frame": {
-        "amount": "1",
-        "asset": "PAPER",
-        "claimByMs": 1792478165249,
-        "expiresMs": 1792477265249,
-        "from": "did:key:z6MkuwTxRT2jAcrg35muXkVU1fg3drYQQQ1LXtf7XNFwANYq",
-        "id": "0xebfd27c9e4064dbc8b767344794d1a6f46e575c13322e99fa361422a0d6169a7",
-        "job": {
-          "context": "/kv/tclk-job-40/didscape-5312d",
-          "id": "didscape-5312de70f91dbf40",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "894f3468d12ab6cd",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792479365249,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:05.804492Z",
-        "_seq": 23302697,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xe024e01c2cefe64d4784dabfb45a33e3640ada8a4bb297a10633944fa83e8301",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkuwTxRT2jAcrg35muXkVU1fg3drYQQQ1LXtf7XNFwANYq",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-40/didscape-5312d",
-        "id": "didscape-5312de70f91dbf40",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:05.804492Z",
-      "accept_ts": "2026-10-20T06:16:06.919401Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:06.919401Z",
-      "last_activity": "2026-10-20T06:16:06.919401Z",
-      "offer_frame": {
-        "amount": "1",
-        "asset": "PAPER",
-        "claimByMs": 1792478165249,
-        "expiresMs": 1792477265249,
-        "from": "did:key:z6MkuwTxRT2jAcrg35muXkVU1fg3drYQQQ1LXtf7XNFwANYq",
-        "id": "0xebfd27c9e4064dbc8b767344794d1a6f46e575c13322e99fa361422a0d6169a7",
-        "job": {
-          "context": "/kv/tclk-job-40/didscape-5312d",
-          "id": "didscape-5312de70f91dbf40",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "894f3468d12ab6cd",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792479365249,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:05.804492Z",
-        "_seq": 23302697,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xebfd27c9e4064dbc8b767344794d1a6f46e575c13322e99fa361422a0d6169a7",
-      "state": "proposed",
-      "payer_did": "did:key:z6MkuwTxRT2jAcrg35muXkVU1fg3drYQQQ1LXtf7XNFwANYq",
-      "payee_did": null,
-      "amount": "1",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-40/didscape-5312d",
-        "id": "didscape-5312de70f91dbf40",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:16:05.804492Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:05.804492Z",
-      "last_activity": "2026-10-20T06:16:05.804492Z",
-      "offer_frame": {
-        "amount": "1",
-        "asset": "PAPER",
-        "claimByMs": 1792478165249,
-        "expiresMs": 1792477265249,
-        "from": "did:key:z6MkuwTxRT2jAcrg35muXkVU1fg3drYQQQ1LXtf7XNFwANYq",
-        "id": "0xebfd27c9e4064dbc8b767344794d1a6f46e575c13322e99fa361422a0d6169a7",
-        "job": {
-          "context": "/kv/tclk-job-40/didscape-5312d",
-          "id": "didscape-5312de70f91dbf40",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "894f3468d12ab6cd",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792479365249,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:05.804492Z",
-        "_seq": 23302697,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xf893aef28e9a4bb9e6452067466276d55a2d4c815442a2bc4c2dd55d94d86a29",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "101",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/scale/job_scale",
-        "id": "scale-1792476961",
-        "proto": "paper"
-      },
-      "offer_ts": "2026-10-20T06:16:01.393809Z",
-      "accept_ts": "2026-10-20T06:16:02.465776Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:02.465776Z",
-      "last_activity": "2026-10-20T06:16:02.465776Z",
-      "offer_frame": {
-        "amount": "101",
-        "asset": "PAPER",
-        "claimByMs": 1792477561341,
-        "expiresMs": 1792478161341,
-        "from": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
-        "id": "0x9181e5be648947e17a8804a216f72fc53eea6bfd142ad16e37544345d364d493",
-        "job": {
-          "context": "/kv/scale/job_scale",
-          "id": "scale-1792476961",
-          "proto": "paper"
-        },
-        "lock": "hash",
-        "nonce": "3178d7b28e207940",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792478041341,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:01.393809Z",
-        "_seq": 23302687,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x7fbcfbc49040eef9247f88061e7f26a449c5a59444e2a8ba56bc3831440e6a43",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:16:02.102369Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:02.102369Z",
-      "last_activity": "2026-10-20T06:16:02.102369Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0xf515b484506f293a0826d39a1e4e8eb3d37ec1a31b2c1cdec47308ca8b5d4c92",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:16:01.567840Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:01.567840Z",
-      "last_activity": "2026-10-20T06:16:01.567840Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x9181e5be648947e17a8804a216f72fc53eea6bfd142ad16e37544345d364d493",
-      "state": "proposed",
-      "payer_did": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
-      "payee_did": null,
-      "amount": "101",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/scale/job_scale",
-        "id": "scale-1792476961",
-        "proto": "paper"
-      },
-      "offer_ts": "2026-10-20T06:16:01.393809Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:01.393809Z",
-      "last_activity": "2026-10-20T06:16:01.393809Z",
-      "offer_frame": {
-        "amount": "101",
-        "asset": "PAPER",
-        "claimByMs": 1792477561341,
-        "expiresMs": 1792478161341,
-        "from": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
-        "id": "0x9181e5be648947e17a8804a216f72fc53eea6bfd142ad16e37544345d364d493",
-        "job": {
-          "context": "/kv/scale/job_scale",
-          "id": "scale-1792476961",
-          "proto": "paper"
-        },
-        "lock": "hash",
-        "nonce": "3178d7b28e207940",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792478041341,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:16:01.393809Z",
-        "_seq": 23302687,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xf8ead7004c6aba6cdebde6006238e7f3752a5558b2696832340ba8e47b82132d",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-      "payee_did": "did:key:z6MkgomcB5aeDFQXe6ujJr3Bx525bzPNGcMPwFC5JmMcBuQH",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-8a4abc51",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:58.102296Z",
-      "accept_ts": "2026-10-20T06:16:01.322546Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:01.322546Z",
-      "last_activity": "2026-10-20T06:16:01.322546Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478759395,
-        "expiresMs": 1792477559395,
-        "from": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-        "id": "0x22e8068a0e05ab3450d3c7b8460814341d2edf598259a7c760fda2133432f406",
-        "job": {
-          "id": "demo-8a4abc51",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "4079d216b1a256d8",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480559395,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:58.102296Z",
-        "_seq": 23302673,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x6a4e55e60e178778ac35365f03b74754e5b00571b3ba4ff5ccd4ae02b6785dd7",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:16:01.309173Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:01.309173Z",
-      "last_activity": "2026-10-20T06:16:01.309173Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x0ad32b1b44ea0d586dba3b60c8c2a0e71f2002d9c342ce79f84ae5359c4f8d15",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:16:01.045085Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:01.045085Z",
-      "last_activity": "2026-10-20T06:16:01.045085Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x4cb7bc6f0bad623366734b3413f7eb657a9af7b3ee938a27d25b8ae92e42d049",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:16:00.087397Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:16:00.087397Z",
-      "last_activity": "2026-10-20T06:16:00.087397Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x966a5c70ece78b0542f62f3aedada0aeb3b75024a4dd599d4f258559ca3bceca",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:15:59.813714Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:59.813714Z",
-      "last_activity": "2026-10-20T06:15:59.813714Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x5344ed64efd0254d7893db949cba7c43891ac2f70e97d4822620981fcde36aea",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-8a4abc51",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:58.102296Z",
-      "accept_ts": "2026-10-20T06:15:58.894830Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:58.894830Z",
-      "last_activity": "2026-10-20T06:15:58.894830Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478759395,
-        "expiresMs": 1792477559395,
-        "from": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-        "id": "0x22e8068a0e05ab3450d3c7b8460814341d2edf598259a7c760fda2133432f406",
-        "job": {
-          "id": "demo-8a4abc51",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "4079d216b1a256d8",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480559395,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:58.102296Z",
-        "_seq": 23302673,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x7ce19a96d226a0f7a1eda693bb7b588fe8da0ea0c7dd14b1861f464832444288",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-8a4abc51",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:58.102296Z",
-      "accept_ts": "2026-10-20T06:15:58.729255Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:58.729255Z",
-      "last_activity": "2026-10-20T06:15:58.729255Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478759395,
-        "expiresMs": 1792477559395,
-        "from": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-        "id": "0x22e8068a0e05ab3450d3c7b8460814341d2edf598259a7c760fda2133432f406",
-        "job": {
-          "id": "demo-8a4abc51",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "4079d216b1a256d8",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480559395,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:58.102296Z",
-        "_seq": 23302673,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x22e8068a0e05ab3450d3c7b8460814341d2edf598259a7c760fda2133432f406",
-      "state": "proposed",
-      "payer_did": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-      "payee_did": null,
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-8a4abc51",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:58.102296Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:58.102296Z",
-      "last_activity": "2026-10-20T06:15:58.102296Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478759395,
-        "expiresMs": 1792477559395,
-        "from": "did:key:z6Mkp8NUqfvfELB6vrGH4AH3Ye2MxrMVAy8QXUgfXumhMDxe",
-        "id": "0x22e8068a0e05ab3450d3c7b8460814341d2edf598259a7c760fda2133432f406",
-        "job": {
-          "id": "demo-8a4abc51",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "4079d216b1a256d8",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480559395,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:58.102296Z",
-        "_seq": 23302673,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x38705b888dd480c8ebf5c86f754df37b5ce99b257a3537cf3f85eb92ca2dee50",
-      "state": "accepted",
-      "payer_did": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1500000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-91/deal-27a3f391",
-        "id": "deal-27a3f391",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:52.146519Z",
-      "accept_ts": "2026-10-20T06:15:53.815880Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:53.815880Z",
-      "last_activity": "2026-10-20T06:15:53.815880Z",
-      "offer_frame": {
-        "amount": "1500000",
-        "asset": "PAPER",
-        "claimByMs": 1792995347239,
-        "expiresMs": 1792563347239,
-        "from": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-        "id": "0xe2bdf6b23578164856aa4615d055af103e5a460a9e2d470073cd53c61b579832",
-        "job": {
-          "context": "/kv/tclk-job-91/deal-27a3f391",
-          "id": "deal-27a3f391",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "b7571b80ae148765",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168147239,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:52.146519Z",
-        "_seq": 23302638,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x975453b7974875ef41436cfa38be2165958ae1853604f87ec9bb5da19df3ca5c",
-      "state": "accepted",
-      "payer_did": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-      "payee_did": "did:key:z6MkkHxtVzKS9vamVBhmecGvBiiDM4FQhCDqZLv3AsFpTB4N",
-      "amount": "1500000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-91/deal-27a3f391",
-        "id": "deal-27a3f391",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:52.146519Z",
-      "accept_ts": "2026-10-20T06:15:53.174446Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:53.174446Z",
-      "last_activity": "2026-10-20T06:15:53.174446Z",
-      "offer_frame": {
-        "amount": "1500000",
-        "asset": "PAPER",
-        "claimByMs": 1792995347239,
-        "expiresMs": 1792563347239,
-        "from": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-        "id": "0xe2bdf6b23578164856aa4615d055af103e5a460a9e2d470073cd53c61b579832",
-        "job": {
-          "context": "/kv/tclk-job-91/deal-27a3f391",
-          "id": "deal-27a3f391",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "b7571b80ae148765",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168147239,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:52.146519Z",
-        "_seq": 23302638,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x156dd480ee092c34e0a2ea94c4a43dbb0f62def7960a483cce8813ea597de912",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-a00c5904",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.982895Z",
-      "accept_ts": "2026-10-20T06:15:52.862145Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:52.862145Z",
-      "last_activity": "2026-10-20T06:15:52.862145Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752206,
-        "expiresMs": 1792477552206,
-        "from": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-        "id": "0x75cc735b60228a4d3883ea65449ec35c2439b2c01fbb63809658f200a03315c4",
-        "job": {
-          "id": "demo-a00c5904",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "439beae501c1e5f5",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552206,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.982895Z",
-        "_seq": 23302630,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x89754fa9eed9478dc72b73d410fde275da0d463c23b2bce6177ba8e108d22c53",
-      "state": "accepted",
-      "payer_did": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-      "payee_did": "did:key:z6Mkr7wYk6b7e6SrikhTWfPU2t1iohHfG2m1UYkLQKwJQjzK",
-      "amount": "1500000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-91/deal-27a3f391",
-        "id": "deal-27a3f391",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:52.146519Z",
-      "accept_ts": "2026-10-20T06:15:52.710975Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:52.710975Z",
-      "last_activity": "2026-10-20T06:15:52.710975Z",
-      "offer_frame": {
-        "amount": "1500000",
-        "asset": "PAPER",
-        "claimByMs": 1792995347239,
-        "expiresMs": 1792563347239,
-        "from": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-        "id": "0xe2bdf6b23578164856aa4615d055af103e5a460a9e2d470073cd53c61b579832",
-        "job": {
-          "context": "/kv/tclk-job-91/deal-27a3f391",
-          "id": "deal-27a3f391",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "b7571b80ae148765",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168147239,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:52.146519Z",
-        "_seq": 23302638,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xa71e0802798336d6c0b4cb860a80183f82c4040c32f16bd52ad75adcfc3b1275",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-819bd6dd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.955195Z",
-      "accept_ts": "2026-10-20T06:15:52.167974Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:52.167974Z",
-      "last_activity": "2026-10-20T06:15:52.167974Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752188,
-        "expiresMs": 1792477552188,
-        "from": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-        "id": "0x5cabab34d88bb00f923bb471f4720a95223bd8d9465ca5fc53a2505c9e1210d6",
-        "job": {
-          "id": "demo-819bd6dd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "24a3b38fd5091a47",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552188,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.955195Z",
-        "_seq": 23302629,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xe2bdf6b23578164856aa4615d055af103e5a460a9e2d470073cd53c61b579832",
-      "state": "proposed",
-      "payer_did": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-      "payee_did": null,
-      "amount": "1500000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "context": "/kv/tclk-job-91/deal-27a3f391",
-        "id": "deal-27a3f391",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:52.146519Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:52.146519Z",
-      "last_activity": "2026-10-20T06:15:52.146519Z",
-      "offer_frame": {
-        "amount": "1500000",
-        "asset": "PAPER",
-        "claimByMs": 1792995347239,
-        "expiresMs": 1792563347239,
-        "from": "did:key:z6MknFpYQTSKFH2ojSnKeXYJz3hEJW2fnKzufTycNF7EZmas",
-        "id": "0xe2bdf6b23578164856aa4615d055af103e5a460a9e2d470073cd53c61b579832",
-        "job": {
-          "context": "/kv/tclk-job-91/deal-27a3f391",
-          "id": "deal-27a3f391",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "b7571b80ae148765",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1793168147239,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:52.146519Z",
-        "_seq": 23302638,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xbb47f163bcc8c30207731ad0aee00659dfeaf445f97c94394681d4e1e7378995",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-a00c5904",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.982895Z",
-      "accept_ts": "2026-10-20T06:15:52.043969Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:52.043969Z",
-      "last_activity": "2026-10-20T06:15:52.043969Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752206,
-        "expiresMs": 1792477552206,
-        "from": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-        "id": "0x75cc735b60228a4d3883ea65449ec35c2439b2c01fbb63809658f200a03315c4",
-        "job": {
-          "id": "demo-a00c5904",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "439beae501c1e5f5",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552206,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.982895Z",
-        "_seq": 23302630,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xf291b2c0afb025626946653bdc08b554ba52a62351bd5f81ebef3ff7f9f8fef8",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-819bd6dd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.955195Z",
-      "accept_ts": "2026-10-20T06:15:52.042928Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:52.042928Z",
-      "last_activity": "2026-10-20T06:15:52.042928Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752188,
-        "expiresMs": 1792477552188,
-        "from": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-        "id": "0x5cabab34d88bb00f923bb471f4720a95223bd8d9465ca5fc53a2505c9e1210d6",
-        "job": {
-          "id": "demo-819bd6dd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "24a3b38fd5091a47",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552188,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.955195Z",
-        "_seq": 23302629,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x596ac6550a5f93a049987b4ee6997fa1477fc76e28fe6ec6d8f13146a693f8ff",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-      "payee_did": "did:key:z6MkfNMZvuMtdLRzwHmkgCSufqgYyhbMkMnjkYazm9ob3AwV",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-a00c5904",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.982895Z",
-      "accept_ts": "2026-10-20T06:15:52.023282Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:52.023282Z",
-      "last_activity": "2026-10-20T06:15:52.023282Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752206,
-        "expiresMs": 1792477552206,
-        "from": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-        "id": "0x75cc735b60228a4d3883ea65449ec35c2439b2c01fbb63809658f200a03315c4",
-        "job": {
-          "id": "demo-a00c5904",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "439beae501c1e5f5",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552206,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.982895Z",
-        "_seq": 23302630,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xc487f3b1367f4c1557813d3a4ce20e1255cf24776978d717a04dba84aa532db0",
-      "state": "revealed",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": null,
-      "lock_count": 1,
-      "reveal_count": 1,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:42.457949Z",
-      "last_activity": "2026-10-20T06:15:52.015900Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x722e942a515752f0e26485c56713fc8379b749a3b2a70872eaa16fecba41881c",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-      "payee_did": "did:key:z6MkuBgMurNGJ1AbCVQ6JJq6P3zsni3GWEpV72359p63goip",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-819bd6dd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.955195Z",
-      "accept_ts": "2026-10-20T06:15:51.975327Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:51.975327Z",
-      "last_activity": "2026-10-20T06:15:51.975327Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752188,
-        "expiresMs": 1792477552188,
-        "from": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-        "id": "0x5cabab34d88bb00f923bb471f4720a95223bd8d9465ca5fc53a2505c9e1210d6",
-        "job": {
-          "id": "demo-819bd6dd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "24a3b38fd5091a47",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552188,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.955195Z",
-        "_seq": 23302629,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x75cc735b60228a4d3883ea65449ec35c2439b2c01fbb63809658f200a03315c4",
-      "state": "proposed",
-      "payer_did": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-      "payee_did": null,
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-a00c5904",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.982895Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:50.982895Z",
-      "last_activity": "2026-10-20T06:15:50.982895Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752206,
-        "expiresMs": 1792477552206,
-        "from": "did:key:z6Mknge8SDKzFXk7zL5bbXjvox5MNoTs78ziLqPq8ekrwrWs",
-        "id": "0x75cc735b60228a4d3883ea65449ec35c2439b2c01fbb63809658f200a03315c4",
-        "job": {
-          "id": "demo-a00c5904",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "439beae501c1e5f5",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552206,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.982895Z",
-        "_seq": 23302630,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x5cabab34d88bb00f923bb471f4720a95223bd8d9465ca5fc53a2505c9e1210d6",
-      "state": "proposed",
-      "payer_did": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-      "payee_did": null,
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-819bd6dd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:50.955195Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:50.955195Z",
-      "last_activity": "2026-10-20T06:15:50.955195Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478752188,
-        "expiresMs": 1792477552188,
-        "from": "did:key:z6MkmRHA3NpeRup9GQ36FbfvmNZwBv6zHP92437i2BW8V9UC",
-        "id": "0x5cabab34d88bb00f923bb471f4720a95223bd8d9465ca5fc53a2505c9e1210d6",
-        "job": {
-          "id": "demo-819bd6dd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "24a3b38fd5091a47",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480552188,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:50.955195Z",
-        "_seq": 23302629,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x0b01078fe6ea1d7b8d7054e0a21774e95b7bee7bb264e3409ba48712feaf1bd3",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:15:50.206689Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:50.206689Z",
-      "last_activity": "2026-10-20T06:15:50.206689Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x0fdb6b9158378473a695b87b9876ccbf3679ec67d2c6dfaf9061a4b9fe07cb5f",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:15:49.906815Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:49.906815Z",
-      "last_activity": "2026-10-20T06:15:49.906815Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x587bb24c97ac3777563bb7f21ee88c8ab5f0946ddf15cee8f6d7ecb74010b991",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:15:49.610715Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:49.610715Z",
-      "last_activity": "2026-10-20T06:15:49.610715Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0xe9c720a9900e31d11b8bb0526b8590dddd6d02680c66011b8808f7a2e6793a28",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:15:49.285924Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:49.285924Z",
-      "last_activity": "2026-10-20T06:15:49.285924Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x5c95c191e2d86a97f860e21cb7eed6a7f927b2a6ea637514e67b6c47b89c5348",
-      "state": "accepted",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": "2026-10-20T06:15:48.995761Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:48.995761Z",
-      "last_activity": "2026-10-20T06:15:48.995761Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x1c6fd3b1a5e0492976b3908b0bbc2b0c89249e7b8a3a2cd89fe0902be2d24c02",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-ea42c5bd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:39.994254Z",
-      "accept_ts": "2026-10-20T06:15:47.458806Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:47.458806Z",
-      "last_activity": "2026-10-20T06:15:47.458806Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478741268,
-        "expiresMs": 1792477541268,
-        "from": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-        "id": "0xf081ac5a94a8cd678c3dba8a726ddb9644303ad2346b0c97dad050ad15385d2e",
-        "job": {
-          "id": "demo-ea42c5bd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "8344452c5c5377d9",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480541268,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:39.994254Z",
-        "_seq": 23302614,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xa42f7581fde8eb7627808e6ba657231de4b789d4a6bb9fea93740e38816d8382",
-      "state": "revealed",
-      "payer_did": null,
-      "payee_did": null,
-      "amount": null,
-      "asset": null,
-      "rails": [],
-      "lock_kind": null,
-      "job": null,
-      "offer_ts": null,
-      "accept_ts": null,
-      "lock_count": 1,
-      "reveal_count": 1,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:38.234820Z",
-      "last_activity": "2026-10-20T06:15:42.565548Z",
-      "offer_frame": null
-    },
-    {
-      "contract_id": "0x1ce8419359c63f39799ecd63e6b71022612c16c5ec634f59774331a30fa772fc",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-      "payee_did": "did:key:z6MkpoYz8yxu2L83CYiy9hrCKsgp5GDRkdaJXom2TCp4TPqc",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-ea42c5bd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:39.994254Z",
-      "accept_ts": "2026-10-20T06:15:41.195157Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:41.195157Z",
-      "last_activity": "2026-10-20T06:15:41.195157Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478741268,
-        "expiresMs": 1792477541268,
-        "from": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-        "id": "0xf081ac5a94a8cd678c3dba8a726ddb9644303ad2346b0c97dad050ad15385d2e",
-        "job": {
-          "id": "demo-ea42c5bd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "8344452c5c5377d9",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480541268,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:39.994254Z",
-        "_seq": 23302614,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xfb86321cc6a001796918240e86ea44e18ef535928fe4b0c9f291f03d817af9b8",
-      "state": "accepted",
-      "payer_did": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-ea42c5bd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:39.994254Z",
-      "accept_ts": "2026-10-20T06:15:41.160173Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:41.160173Z",
-      "last_activity": "2026-10-20T06:15:41.160173Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478741268,
-        "expiresMs": 1792477541268,
-        "from": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-        "id": "0xf081ac5a94a8cd678c3dba8a726ddb9644303ad2346b0c97dad050ad15385d2e",
-        "job": {
-          "id": "demo-ea42c5bd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "8344452c5c5377d9",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480541268,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:39.994254Z",
-        "_seq": 23302614,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xf081ac5a94a8cd678c3dba8a726ddb9644303ad2346b0c97dad050ad15385d2e",
-      "state": "proposed",
-      "payer_did": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-      "payee_did": null,
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-ea42c5bd",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:39.994254Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:39.994254Z",
-      "last_activity": "2026-10-20T06:15:39.994254Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478741268,
-        "expiresMs": 1792477541268,
-        "from": "did:key:z6MkgGmbikPSakYVzsbStFjDwNHtYNEeZ4Xm2VjJWUwvLUyw",
-        "id": "0xf081ac5a94a8cd678c3dba8a726ddb9644303ad2346b0c97dad050ad15385d2e",
-        "job": {
-          "id": "demo-ea42c5bd",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "8344452c5c5377d9",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480541268,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:39.994254Z",
-        "_seq": 23302614,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xf7ae7499c94dd4acda7fb187662385329a2046166332f5b77090c8cdbbd46f87",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mkqk1ZfY2GYW1VmkgAS7ixqpqHqjjp6V4gooZLe465M93u",
-      "payee_did": "did:key:z6MkvyfE5qQFEayqunB53DMNvRRdU8RGAFdcpm4CW2cJCG3f",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-caedccb9",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:37.326180Z",
-      "accept_ts": "2026-10-20T06:15:38.290843Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:38.290843Z",
-      "last_activity": "2026-10-20T06:15:38.290843Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478737544,
-        "expiresMs": 1792477537544,
-        "from": "did:key:z6Mkqk1ZfY2GYW1VmkgAS7ixqpqHqjjp6V4gooZLe465M93u",
-        "id": "0xe146fd3fffa5e33d66cdaff847674e8726c344693a11934f684513c72f54aa9b",
-        "job": {
-          "id": "demo-caedccb9",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "cf92b53ec6a623db",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480537544,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:37.326180Z",
-        "_seq": 23302605,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x10469bdfef63d522c4f3f702401b150e91810de431c2258eaa146415e5087ab2",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mkqk1ZfY2GYW1VmkgAS7ixqpqHqjjp6V4gooZLe465M93u",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-caedccb9",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:37.326180Z",
-      "accept_ts": "2026-10-20T06:15:38.075270Z",
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:38.075270Z",
-      "last_activity": "2026-10-20T06:15:38.075270Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478737544,
-        "expiresMs": 1792477537544,
-        "from": "did:key:z6Mkqk1ZfY2GYW1VmkgAS7ixqpqHqjjp6V4gooZLe465M93u",
-        "id": "0xe146fd3fffa5e33d66cdaff847674e8726c344693a11934f684513c72f54aa9b",
-        "job": {
-          "id": "demo-caedccb9",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "cf92b53ec6a623db",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480537544,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:37.326180Z",
-        "_seq": 23302605,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0xe146fd3fffa5e33d66cdaff847674e8726c344693a11934f684513c72f54aa9b",
-      "state": "proposed",
-      "payer_did": "did:key:z6Mkqk1ZfY2GYW1VmkgAS7ixqpqHqjjp6V4gooZLe465M93u",
-      "payee_did": null,
-      "amount": "1000000",
-      "asset": "PAPER",
-      "rails": [
-        "paper"
-      ],
-      "lock_kind": "hash",
-      "job": {
-        "id": "demo-caedccb9",
-        "proto": "a2a"
-      },
-      "offer_ts": "2026-10-20T06:15:37.326180Z",
-      "accept_ts": null,
-      "lock_count": 0,
-      "reveal_count": 0,
-      "refund_count": 0,
-      "cancel_count": 0,
-      "receipt_count": 0,
-      "receipt_outcome": null,
-      "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:37.326180Z",
-      "last_activity": "2026-10-20T06:15:37.326180Z",
-      "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478737544,
-        "expiresMs": 1792477537544,
-        "from": "did:key:z6Mkqk1ZfY2GYW1VmkgAS7ixqpqHqjjp6V4gooZLe465M93u",
-        "id": "0xe146fd3fffa5e33d66cdaff847674e8726c344693a11934f684513c72f54aa9b",
-        "job": {
-          "id": "demo-caedccb9",
-          "proto": "a2a"
-        },
-        "lock": "hash",
-        "nonce": "cf92b53ec6a623db",
-        "rails": [
-          "paper"
-        ],
-        "refundAfterMs": 1792480537544,
-        "role": "payer",
-        "type": "offer",
-        "_ts": "2026-10-20T06:15:37.326180Z",
-        "_seq": 23302605,
-        "_room": "tclk-offers"
-      }
-    },
-    {
-      "contract_id": "0x360cf4fe5ab8d498e22c9190f4d9b927be905aaaf0789a358cff5d7b61564553",
+      "contract_id": "0xf28dcbc51e6484d2e695a052aeff1d2ccc9dbcf1c4b0551295571a112e5acd64",
       "state": "accepted",
       "payer_did": "did:key:z6Mkpn8x4ycvyJtVmTsP2aNNTa8psCrGN8ZYUfpktK2F4zuQ",
-      "payee_did": "did:key:z6MkqrMttc73ZvJJAb51vj7TnaHNXG7xHtWr4Y5bGmtHtarj",
+      "payee_did": "did:key:z6MkrkoBJQaMtkJmaBT6KbgVcCDdmc5GZtLf9Xrtc976YEH2",
       "amount": "50",
       "asset": "FLOP",
       "rails": [
@@ -2519,11 +202,11 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "task_e75fd51e",
+        "id": "task_1553cc7a",
         "proto": "acp"
       },
-      "offer_ts": "2026-10-20T06:15:29.374188Z",
-      "accept_ts": "2026-10-20T06:15:36.216718Z",
+      "offer_ts": "2026-10-20T08:12:57.175987Z",
+      "accept_ts": "2026-10-20T08:13:10.301484Z",
       "lock_count": 0,
       "reveal_count": 0,
       "refund_count": 0,
@@ -2531,17 +214,17 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:36.216718Z",
-      "last_activity": "2026-10-20T06:15:36.216718Z",
+      "first_seen": "2026-10-20T08:13:10.301484Z",
+      "last_activity": "2026-10-20T08:13:10.301484Z",
       "offer_frame": {
         "type": "offer",
-        "id": "0xe75fd51eb9ebd7993b6dbd22f11030b8059bb2fa01148473cad22df2962f3274",
-        "from": "did:key:z6MkqrMttc73ZvJJAb51vj7TnaHNXG7xHtWr4Y5bGmtHtarj",
+        "id": "0x1553cc7a529262c2ec04f1893499e205fc4162be90c05e13accbcfbd61e592e2",
+        "from": "did:key:z6MkrkoBJQaMtkJmaBT6KbgVcCDdmc5GZtLf9Xrtc976YEH2",
         "role": "payee",
         "amount": "50",
         "asset": "FLOP",
         "job": {
-          "id": "task_e75fd51e",
+          "id": "task_1553cc7a",
           "proto": "acp"
         },
         "rails": [
@@ -2549,20 +232,274 @@
           "paper"
         ],
         "lock": "hash",
-        "nonce": "1792476929172",
-        "expiresMs": 1792478729172,
-        "claimByMs": 1792480529172,
-        "refundAfterMs": 1792484129172,
-        "_ts": "2026-10-20T06:15:29.374188Z",
-        "_seq": 23302572,
+        "nonce": "1792483976956",
+        "expiresMs": 1792485776956,
+        "claimByMs": 1792487576956,
+        "refundAfterMs": 1792491176956,
+        "_ts": "2026-10-20T08:12:57.175987Z",
+        "_seq": 23317835,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0xe844c181f9bcc638ac9d66d9526c3fec8022d4027ed4fcf870e1136b369e6336",
+      "contract_id": "0x0e129b1d6976dc9471ef2068fb3987a8b8353839ad4af3770a6b01babf84e3cc",
+      "state": "accepted",
+      "payer_did": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "101",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "/kv/scale/job_scale",
+        "id": "scale-1792483981",
+        "proto": "paper"
+      },
+      "offer_ts": "2026-10-20T08:13:01.337061Z",
+      "accept_ts": "2026-10-20T08:13:02.452985Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:13:02.452985Z",
+      "last_activity": "2026-10-20T08:13:02.452985Z",
+      "offer_frame": {
+        "amount": "101",
+        "asset": "PAPER",
+        "claimByMs": 1792484581259,
+        "expiresMs": 1792485181259,
+        "from": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+        "id": "0x16e0f1b59f9c019927aa4b37e06c327b80e0d123b46055f98820a45db54fb597",
+        "job": {
+          "context": "/kv/scale/job_scale",
+          "id": "scale-1792483981",
+          "proto": "paper"
+        },
+        "lock": "hash",
+        "nonce": "eee8c5b58c05c163",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792485061259,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:13:01.337061Z",
+        "_seq": 23317840,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x0448e34eab1da5decf2f0a34d58b64147c2d9d97f78249a0a16a63808efe9631",
+      "state": "accepted",
+      "payer_did": "did:key:z6Mkn5cMUMJ3XSw6FJctYSkxp5BtPSUJqtdWLFyD2HmMTaK8",
+      "payee_did": "did:key:z6Mkh7t9F9nSNmpsECV9mNRuPsoTDr9zNQA2Kz6p9eYX9Rwb",
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-f6f97e9a",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:13:00.165899Z",
+      "accept_ts": "2026-10-20T08:13:01.868473Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:13:01.868473Z",
+      "last_activity": "2026-10-20T08:13:01.868473Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485779537,
+        "expiresMs": 1792484579537,
+        "from": "did:key:z6Mkn5cMUMJ3XSw6FJctYSkxp5BtPSUJqtdWLFyD2HmMTaK8",
+        "id": "0x13da27733f82c50b6ef878533c8364f2771f3dd53020643f7c99036c60c64962",
+        "job": {
+          "id": "demo-f6f97e9a",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "1cd0f84321b9ad11",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487579537,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:13:00.165899Z",
+        "_seq": 23317838,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x16e0f1b59f9c019927aa4b37e06c327b80e0d123b46055f98820a45db54fb597",
+      "state": "proposed",
+      "payer_did": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+      "payee_did": null,
+      "amount": "101",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "/kv/scale/job_scale",
+        "id": "scale-1792483981",
+        "proto": "paper"
+      },
+      "offer_ts": "2026-10-20T08:13:01.337061Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:13:01.337061Z",
+      "last_activity": "2026-10-20T08:13:01.337061Z",
+      "offer_frame": {
+        "amount": "101",
+        "asset": "PAPER",
+        "claimByMs": 1792484581259,
+        "expiresMs": 1792485181259,
+        "from": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+        "id": "0x16e0f1b59f9c019927aa4b37e06c327b80e0d123b46055f98820a45db54fb597",
+        "job": {
+          "context": "/kv/scale/job_scale",
+          "id": "scale-1792483981",
+          "proto": "paper"
+        },
+        "lock": "hash",
+        "nonce": "eee8c5b58c05c163",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792485061259,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:13:01.337061Z",
+        "_seq": 23317840,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x99f2570df5895fa2d1c861ef9058a48fd1737af884a3acad7f687579820c5bdc",
+      "state": "accepted",
+      "payer_did": "did:key:z6Mkn5cMUMJ3XSw6FJctYSkxp5BtPSUJqtdWLFyD2HmMTaK8",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-f6f97e9a",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:13:00.165899Z",
+      "accept_ts": "2026-10-20T08:13:01.065811Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:13:01.065811Z",
+      "last_activity": "2026-10-20T08:13:01.065811Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485779537,
+        "expiresMs": 1792484579537,
+        "from": "did:key:z6Mkn5cMUMJ3XSw6FJctYSkxp5BtPSUJqtdWLFyD2HmMTaK8",
+        "id": "0x13da27733f82c50b6ef878533c8364f2771f3dd53020643f7c99036c60c64962",
+        "job": {
+          "id": "demo-f6f97e9a",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "1cd0f84321b9ad11",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487579537,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:13:00.165899Z",
+        "_seq": 23317838,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x13da27733f82c50b6ef878533c8364f2771f3dd53020643f7c99036c60c64962",
+      "state": "proposed",
+      "payer_did": "did:key:z6Mkn5cMUMJ3XSw6FJctYSkxp5BtPSUJqtdWLFyD2HmMTaK8",
+      "payee_did": null,
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-f6f97e9a",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:13:00.165899Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:13:00.165899Z",
+      "last_activity": "2026-10-20T08:13:00.165899Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485779537,
+        "expiresMs": 1792484579537,
+        "from": "did:key:z6Mkn5cMUMJ3XSw6FJctYSkxp5BtPSUJqtdWLFyD2HmMTaK8",
+        "id": "0x13da27733f82c50b6ef878533c8364f2771f3dd53020643f7c99036c60c64962",
+        "job": {
+          "id": "demo-f6f97e9a",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "1cd0f84321b9ad11",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487579537,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:13:00.165899Z",
+        "_seq": 23317838,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x872ced1dabf791af8665fbb4f98d35baa41fab8750c72bface9b5c8653998eee",
       "state": "accepted",
       "payer_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
-      "payee_did": "did:key:z6MkqrMttc73ZvJJAb51vj7TnaHNXG7xHtWr4Y5bGmtHtarj",
+      "payee_did": "did:key:z6MkrkoBJQaMtkJmaBT6KbgVcCDdmc5GZtLf9Xrtc976YEH2",
       "amount": "50",
       "asset": "FLOP",
       "rails": [
@@ -2571,11 +508,11 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "task_e75fd51e",
+        "id": "task_1553cc7a",
         "proto": "acp"
       },
-      "offer_ts": "2026-10-20T06:15:29.374188Z",
-      "accept_ts": "2026-10-20T06:15:29.814457Z",
+      "offer_ts": "2026-10-20T08:12:57.175987Z",
+      "accept_ts": "2026-10-20T08:12:57.480266Z",
       "lock_count": 0,
       "reveal_count": 0,
       "refund_count": 0,
@@ -2583,17 +520,17 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:29.814457Z",
-      "last_activity": "2026-10-20T06:15:29.814457Z",
+      "first_seen": "2026-10-20T08:12:57.480266Z",
+      "last_activity": "2026-10-20T08:12:57.480266Z",
       "offer_frame": {
         "type": "offer",
-        "id": "0xe75fd51eb9ebd7993b6dbd22f11030b8059bb2fa01148473cad22df2962f3274",
-        "from": "did:key:z6MkqrMttc73ZvJJAb51vj7TnaHNXG7xHtWr4Y5bGmtHtarj",
+        "id": "0x1553cc7a529262c2ec04f1893499e205fc4162be90c05e13accbcfbd61e592e2",
+        "from": "did:key:z6MkrkoBJQaMtkJmaBT6KbgVcCDdmc5GZtLf9Xrtc976YEH2",
         "role": "payee",
         "amount": "50",
         "asset": "FLOP",
         "job": {
-          "id": "task_e75fd51e",
+          "id": "task_1553cc7a",
           "proto": "acp"
         },
         "rails": [
@@ -2601,20 +538,20 @@
           "paper"
         ],
         "lock": "hash",
-        "nonce": "1792476929172",
-        "expiresMs": 1792478729172,
-        "claimByMs": 1792480529172,
-        "refundAfterMs": 1792484129172,
-        "_ts": "2026-10-20T06:15:29.374188Z",
-        "_seq": 23302572,
+        "nonce": "1792483976956",
+        "expiresMs": 1792485776956,
+        "claimByMs": 1792487576956,
+        "refundAfterMs": 1792491176956,
+        "_ts": "2026-10-20T08:12:57.175987Z",
+        "_seq": 23317835,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0xe75fd51eb9ebd7993b6dbd22f11030b8059bb2fa01148473cad22df2962f3274",
+      "contract_id": "0x1553cc7a529262c2ec04f1893499e205fc4162be90c05e13accbcfbd61e592e2",
       "state": "proposed",
       "payer_did": null,
-      "payee_did": "did:key:z6MkqrMttc73ZvJJAb51vj7TnaHNXG7xHtWr4Y5bGmtHtarj",
+      "payee_did": "did:key:z6MkrkoBJQaMtkJmaBT6KbgVcCDdmc5GZtLf9Xrtc976YEH2",
       "amount": "50",
       "asset": "FLOP",
       "rails": [
@@ -2623,10 +560,10 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "task_e75fd51e",
+        "id": "task_1553cc7a",
         "proto": "acp"
       },
-      "offer_ts": "2026-10-20T06:15:29.374188Z",
+      "offer_ts": "2026-10-20T08:12:57.175987Z",
       "accept_ts": null,
       "lock_count": 0,
       "reveal_count": 0,
@@ -2635,17 +572,17 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:29.374188Z",
-      "last_activity": "2026-10-20T06:15:29.374188Z",
+      "first_seen": "2026-10-20T08:12:57.175987Z",
+      "last_activity": "2026-10-20T08:12:57.175987Z",
       "offer_frame": {
         "type": "offer",
-        "id": "0xe75fd51eb9ebd7993b6dbd22f11030b8059bb2fa01148473cad22df2962f3274",
-        "from": "did:key:z6MkqrMttc73ZvJJAb51vj7TnaHNXG7xHtWr4Y5bGmtHtarj",
+        "id": "0x1553cc7a529262c2ec04f1893499e205fc4162be90c05e13accbcfbd61e592e2",
+        "from": "did:key:z6MkrkoBJQaMtkJmaBT6KbgVcCDdmc5GZtLf9Xrtc976YEH2",
         "role": "payee",
         "amount": "50",
         "asset": "FLOP",
         "job": {
-          "id": "task_e75fd51e",
+          "id": "task_1553cc7a",
           "proto": "acp"
         },
         "rails": [
@@ -2653,20 +590,20 @@
           "paper"
         ],
         "lock": "hash",
-        "nonce": "1792476929172",
-        "expiresMs": 1792478729172,
-        "claimByMs": 1792480529172,
-        "refundAfterMs": 1792484129172,
-        "_ts": "2026-10-20T06:15:29.374188Z",
-        "_seq": 23302572,
+        "nonce": "1792483976956",
+        "expiresMs": 1792485776956,
+        "claimByMs": 1792487576956,
+        "refundAfterMs": 1792491176956,
+        "_ts": "2026-10-20T08:12:57.175987Z",
+        "_seq": 23317835,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0xe3ab776ee6c80ba10343180356874011514ffa801815463ee2fd4b33381fe055",
-      "state": "accepted",
-      "payer_did": "did:key:z6Mkmh7pXJyxQRidRxVd41rE2RfAUG5Yq2DmNvUBfcoikBXL",
-      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "contract_id": "0x33e6095d6a5e303def44dcba5d42d1fff53dd6f6c0f90dd74c1979beb0310614",
+      "state": "revealed",
+      "payer_did": "did:key:z6MksUTJ11YdB8q5LwNBK38kY8TNRaCbioqw3PHCqx8aTfkP",
+      "payee_did": "did:key:z6MkgZ5UU8bd5ybxfDpyCtz7NzK3HQ5v7QYRQ6Rq4ykNuU6U",
       "amount": "1000000",
       "asset": "PAPER",
       "rails": [
@@ -2674,11 +611,61 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "demo-984ec483",
+        "id": "demo-69b824cc",
         "proto": "a2a"
       },
-      "offer_ts": "2026-10-20T06:15:26.032922Z",
-      "accept_ts": "2026-10-20T06:15:27.118275Z",
+      "offer_ts": "2026-10-20T08:11:31.358516Z",
+      "accept_ts": "2026-10-20T08:11:32.162857Z",
+      "lock_count": 1,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:32.162857Z",
+      "last_activity": "2026-10-20T08:12:37.636621Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485690744,
+        "expiresMs": 1792484490744,
+        "from": "did:key:z6MksUTJ11YdB8q5LwNBK38kY8TNRaCbioqw3PHCqx8aTfkP",
+        "id": "0x17d70de9aad153f5c506667ffbaa708cae022554c665cc722278e6be5c7cd6d2",
+        "job": {
+          "id": "demo-69b824cc",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "4b6b7fb71ddb3d66",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487490744,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:31.358516Z",
+        "_seq": 23317710,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0xdcd83ffbed01010c1578cfe38aa5bceccebf04b5042308624df826189ffaca45",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "kab294d1ad2",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:12:36.289221Z",
+      "accept_ts": "2026-10-20T08:12:37.316182Z",
       "lock_count": 0,
       "reveal_count": 0,
       "refund_count": 0,
@@ -2686,48 +673,98 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:27.118275Z",
-      "last_activity": "2026-10-20T06:15:27.118275Z",
+      "first_seen": "2026-10-20T08:12:37.316182Z",
+      "last_activity": "2026-10-20T08:12:37.316182Z",
       "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478727040,
-        "expiresMs": 1792477527040,
-        "from": "did:key:z6Mkmh7pXJyxQRidRxVd41rE2RfAUG5Yq2DmNvUBfcoikBXL",
-        "id": "0x02796628b9f273d113c2885e82a91ac27f5182b127b6ecdbc5e11c16efd1b214",
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915956177,
+        "expiresMs": 1792656756177,
+        "from": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+        "id": "0x800946040d06f1f4b07f907d56bfd0b69d2ce8563d1e65f167a199d56548c0c7",
         "job": {
-          "id": "demo-984ec483",
-          "proto": "a2a"
+          "id": "kab294d1ad2",
+          "proto": "kibble"
         },
         "lock": "hash",
-        "nonce": "ad4bab45f4171183",
+        "nonce": "440832c43072a13c",
         "rails": [
           "paper"
         ],
-        "refundAfterMs": 1792480527040,
+        "refundAfterMs": 1793088756177,
         "role": "payer",
         "type": "offer",
-        "_ts": "2026-10-20T06:15:26.032922Z",
-        "_seq": 23302568,
+        "_ts": "2026-10-20T08:12:36.289221Z",
+        "_seq": 23317815,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0x02796628b9f273d113c2885e82a91ac27f5182b127b6ecdbc5e11c16efd1b214",
-      "state": "proposed",
-      "payer_did": "did:key:z6Mkmh7pXJyxQRidRxVd41rE2RfAUG5Yq2DmNvUBfcoikBXL",
-      "payee_did": null,
-      "amount": "1000000",
-      "asset": "PAPER",
+      "contract_id": "0x96b13b6717118fed17408e0baea8aadf3fd5316d1f93a05d96f16555cfdeffad",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
+      "amount": "100",
+      "asset": "FLOP",
       "rails": [
         "paper"
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "demo-984ec483",
-        "proto": "a2a"
+        "id": "kab294d1ad2",
+        "proto": "kibble"
       },
-      "offer_ts": "2026-10-20T06:15:26.032922Z",
+      "offer_ts": "2026-10-20T08:12:36.289221Z",
+      "accept_ts": "2026-10-20T08:12:37.207911Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:12:37.207911Z",
+      "last_activity": "2026-10-20T08:12:37.207911Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915956177,
+        "expiresMs": 1792656756177,
+        "from": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+        "id": "0x800946040d06f1f4b07f907d56bfd0b69d2ce8563d1e65f167a199d56548c0c7",
+        "job": {
+          "id": "kab294d1ad2",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "440832c43072a13c",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088756177,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:12:36.289221Z",
+        "_seq": 23317815,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x800946040d06f1f4b07f907d56bfd0b69d2ce8563d1e65f167a199d56548c0c7",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "kab294d1ad2",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:12:36.289221Z",
       "accept_ts": null,
       "lock_count": 0,
       "reveal_count": 0,
@@ -2736,36 +773,86 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:26.032922Z",
-      "last_activity": "2026-10-20T06:15:26.032922Z",
+      "first_seen": "2026-10-20T08:12:36.289221Z",
+      "last_activity": "2026-10-20T08:12:36.289221Z",
       "offer_frame": {
-        "amount": "1000000",
-        "asset": "PAPER",
-        "claimByMs": 1792478727040,
-        "expiresMs": 1792477527040,
-        "from": "did:key:z6Mkmh7pXJyxQRidRxVd41rE2RfAUG5Yq2DmNvUBfcoikBXL",
-        "id": "0x02796628b9f273d113c2885e82a91ac27f5182b127b6ecdbc5e11c16efd1b214",
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915956177,
+        "expiresMs": 1792656756177,
+        "from": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+        "id": "0x800946040d06f1f4b07f907d56bfd0b69d2ce8563d1e65f167a199d56548c0c7",
         "job": {
-          "id": "demo-984ec483",
-          "proto": "a2a"
+          "id": "kab294d1ad2",
+          "proto": "kibble"
         },
         "lock": "hash",
-        "nonce": "ad4bab45f4171183",
+        "nonce": "440832c43072a13c",
         "rails": [
           "paper"
         ],
-        "refundAfterMs": 1792480527040,
+        "refundAfterMs": 1793088756177,
         "role": "payer",
         "type": "offer",
-        "_ts": "2026-10-20T06:15:26.032922Z",
-        "_seq": 23302568,
+        "_ts": "2026-10-20T08:12:36.289221Z",
+        "_seq": 23317815,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0x9f4a75d0817905e8f2120b859f7125afcf0bc82273e6364138123c746b5e9372",
+      "contract_id": "0x3fc3ab8efc6963c110499fe399787c637d796694d9c40a767f69b900d0413a46",
       "state": "accepted",
-      "payer_did": "did:key:z6Mkj9gKMf2hf6DgihyNXaXiXof92TagjzumXpaGB4DHJFtY",
+      "payer_did": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
+      "payee_did": "did:key:z6MkpNpryzcEzrGkn5xnQ7DFM5VfR1Q34qQfqGpsnyrxzYSu",
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-2331048b",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:12:31.995828Z",
+      "accept_ts": "2026-10-20T08:12:35.288377Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:12:35.288377Z",
+      "last_activity": "2026-10-20T08:12:35.288377Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485751430,
+        "expiresMs": 1792484551430,
+        "from": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
+        "id": "0x7a90c746fdd90df1d5bdf8355009724c95356c270432db18cecb472cb7fbcb7f",
+        "job": {
+          "id": "demo-2331048b",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "c7bd4a124184e38c",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487551430,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:12:31.995828Z",
+        "_seq": 23317807,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x45bb13af257e5aaf278eb08c146dfb4b6f9157d6e10b96a5e2a4063c7f9a2e2a",
+      "state": "accepted",
+      "payer_did": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
       "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
       "amount": "1000000",
       "asset": "PAPER",
@@ -2774,11 +861,11 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "demo-690b990c",
+        "id": "demo-2331048b",
         "proto": "a2a"
       },
-      "offer_ts": "2026-10-20T06:15:19.835390Z",
-      "accept_ts": "2026-10-20T06:15:20.743918Z",
+      "offer_ts": "2026-10-20T08:12:31.995828Z",
+      "accept_ts": "2026-10-20T08:12:32.890521Z",
       "lock_count": 0,
       "reveal_count": 0,
       "refund_count": 0,
@@ -2786,36 +873,86 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:20.743918Z",
-      "last_activity": "2026-10-20T06:15:20.743918Z",
+      "first_seen": "2026-10-20T08:12:32.890521Z",
+      "last_activity": "2026-10-20T08:12:32.890521Z",
       "offer_frame": {
         "amount": "1000000",
         "asset": "PAPER",
-        "claimByMs": 1792478721070,
-        "expiresMs": 1792477521070,
-        "from": "did:key:z6Mkj9gKMf2hf6DgihyNXaXiXof92TagjzumXpaGB4DHJFtY",
-        "id": "0xfb942edf398221161c6c02fc8ce365a4d3d75b525aaa2e4d5234963c10999da7",
+        "claimByMs": 1792485751430,
+        "expiresMs": 1792484551430,
+        "from": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
+        "id": "0x7a90c746fdd90df1d5bdf8355009724c95356c270432db18cecb472cb7fbcb7f",
         "job": {
-          "id": "demo-690b990c",
+          "id": "demo-2331048b",
           "proto": "a2a"
         },
         "lock": "hash",
-        "nonce": "a41165b5aedd5187",
+        "nonce": "c7bd4a124184e38c",
         "rails": [
           "paper"
         ],
-        "refundAfterMs": 1792480521070,
+        "refundAfterMs": 1792487551430,
         "role": "payer",
         "type": "offer",
-        "_ts": "2026-10-20T06:15:19.835390Z",
-        "_seq": 23302561,
+        "_ts": "2026-10-20T08:12:31.995828Z",
+        "_seq": 23317807,
         "_room": "tclk-offers"
       }
     },
     {
-      "contract_id": "0xfb942edf398221161c6c02fc8ce365a4d3d75b525aaa2e4d5234963c10999da7",
+      "contract_id": "0x70faf33d1bec2001816ab90d7d8e7ee421c13204508b4d255886ba70dba595bc",
+      "state": "accepted",
+      "payer_did": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
+      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-2331048b",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:12:31.995828Z",
+      "accept_ts": "2026-10-20T08:12:32.363538Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:12:32.363538Z",
+      "last_activity": "2026-10-20T08:12:32.363538Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485751430,
+        "expiresMs": 1792484551430,
+        "from": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
+        "id": "0x7a90c746fdd90df1d5bdf8355009724c95356c270432db18cecb472cb7fbcb7f",
+        "job": {
+          "id": "demo-2331048b",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "c7bd4a124184e38c",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487551430,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:12:31.995828Z",
+        "_seq": 23317807,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x7a90c746fdd90df1d5bdf8355009724c95356c270432db18cecb472cb7fbcb7f",
       "state": "proposed",
-      "payer_did": "did:key:z6Mkj9gKMf2hf6DgihyNXaXiXof92TagjzumXpaGB4DHJFtY",
+      "payer_did": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
       "payee_did": null,
       "amount": "1000000",
       "asset": "PAPER",
@@ -2824,10 +961,10 @@
       ],
       "lock_kind": "hash",
       "job": {
-        "id": "demo-690b990c",
+        "id": "demo-2331048b",
         "proto": "a2a"
       },
-      "offer_ts": "2026-10-20T06:15:19.835390Z",
+      "offer_ts": "2026-10-20T08:12:31.995828Z",
       "accept_ts": null,
       "lock_count": 0,
       "reveal_count": 0,
@@ -2836,31 +973,2278 @@
       "receipt_count": 0,
       "receipt_outcome": null,
       "heartbeat_count": 0,
-      "first_seen": "2026-10-20T06:15:19.835390Z",
-      "last_activity": "2026-10-20T06:15:19.835390Z",
+      "first_seen": "2026-10-20T08:12:31.995828Z",
+      "last_activity": "2026-10-20T08:12:31.995828Z",
       "offer_frame": {
         "amount": "1000000",
         "asset": "PAPER",
-        "claimByMs": 1792478721070,
-        "expiresMs": 1792477521070,
-        "from": "did:key:z6Mkj9gKMf2hf6DgihyNXaXiXof92TagjzumXpaGB4DHJFtY",
-        "id": "0xfb942edf398221161c6c02fc8ce365a4d3d75b525aaa2e4d5234963c10999da7",
+        "claimByMs": 1792485751430,
+        "expiresMs": 1792484551430,
+        "from": "did:key:z6MknX4P8ZcFmFxcUz8byDLCipB2iJ673GJrVbzxEG9GuPfh",
+        "id": "0x7a90c746fdd90df1d5bdf8355009724c95356c270432db18cecb472cb7fbcb7f",
         "job": {
-          "id": "demo-690b990c",
+          "id": "demo-2331048b",
           "proto": "a2a"
         },
         "lock": "hash",
-        "nonce": "a41165b5aedd5187",
+        "nonce": "c7bd4a124184e38c",
         "rails": [
           "paper"
         ],
-        "refundAfterMs": 1792480521070,
+        "refundAfterMs": 1792487551430,
         "role": "payer",
         "type": "offer",
-        "_ts": "2026-10-20T06:15:19.835390Z",
-        "_seq": 23302561,
+        "_ts": "2026-10-20T08:12:31.995828Z",
+        "_seq": 23317807,
         "_room": "tclk-offers"
       }
+    },
+    {
+      "contract_id": "0xa31844de2c8d137e1f312cd3e58087aaf287f28d445ad4b4e4546694b30ad7e3",
+      "state": "revealed",
+      "payer_did": "did:key:z6Mknbq2MswgkeFZmVpnTytPt1Pr9UsicDBaEBpxbJLQdWtG",
+      "payee_did": "did:key:z6MkiGQV7kRdDAD5JruKpdeb6XuWTCUf76XUTX9A6gBakQvg",
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-59a19a0a",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:11:11.639003Z",
+      "accept_ts": "2026-10-20T08:11:13.380587Z",
+      "lock_count": 1,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:13.380587Z",
+      "last_activity": "2026-10-20T08:12:19.459925Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485671055,
+        "expiresMs": 1792484471055,
+        "from": "did:key:z6Mknbq2MswgkeFZmVpnTytPt1Pr9UsicDBaEBpxbJLQdWtG",
+        "id": "0x55c2e1e5c39f9182ed7970076e1fe38be6a0ada37b233f1e8eb68d5b71934878",
+        "job": {
+          "id": "demo-59a19a0a",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "865da2b2c45351a4",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487471055,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:11.639003Z",
+        "_seq": 23317677,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0xafade3aa4e277bc63c3d8aef5798baa031c337ef31135b553e93a4e0d409d56c",
+      "state": "revealed",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": null,
+      "lock_count": 1,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:59.215138Z",
+      "last_activity": "2026-10-20T08:12:02.768671Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0x844a5298d18ef8cda37d3c25c9a8dc8e7012bf4354f934198837406fb5100478",
+      "state": "accepted",
+      "payer_did": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "101",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "/kv/scale/job_scale",
+        "id": "scale-1792483921",
+        "proto": "paper"
+      },
+      "offer_ts": "2026-10-20T08:12:01.914639Z",
+      "accept_ts": "2026-10-20T08:12:02.648477Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:12:02.648477Z",
+      "last_activity": "2026-10-20T08:12:02.648477Z",
+      "offer_frame": {
+        "amount": "101",
+        "asset": "PAPER",
+        "claimByMs": 1792484521830,
+        "expiresMs": 1792485121830,
+        "from": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+        "id": "0xa59f9b1e07ed0ec0a2c87fb227410b5c41b221b8037650abab3ab41729afe28e",
+        "job": {
+          "context": "/kv/scale/job_scale",
+          "id": "scale-1792483921",
+          "proto": "paper"
+        },
+        "lock": "hash",
+        "nonce": "49a03260165ea408",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792485001830,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:12:01.914639Z",
+        "_seq": 23317780,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0xa59f9b1e07ed0ec0a2c87fb227410b5c41b221b8037650abab3ab41729afe28e",
+      "state": "proposed",
+      "payer_did": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+      "payee_did": null,
+      "amount": "101",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "/kv/scale/job_scale",
+        "id": "scale-1792483921",
+        "proto": "paper"
+      },
+      "offer_ts": "2026-10-20T08:12:01.914639Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:12:01.914639Z",
+      "last_activity": "2026-10-20T08:12:01.914639Z",
+      "offer_frame": {
+        "amount": "101",
+        "asset": "PAPER",
+        "claimByMs": 1792484521830,
+        "expiresMs": 1792485121830,
+        "from": "did:key:z6Mkoxnz6X1HLE1Ut4NPHYExPbtSNNgodtMxWd99hbRwt6fa",
+        "id": "0xa59f9b1e07ed0ec0a2c87fb227410b5c41b221b8037650abab3ab41729afe28e",
+        "job": {
+          "context": "/kv/scale/job_scale",
+          "id": "scale-1792483921",
+          "proto": "paper"
+        },
+        "lock": "hash",
+        "nonce": "49a03260165ea408",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792485001830,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:12:01.914639Z",
+        "_seq": 23317780,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x4a75c553ca9e44194b3ce51c15cdc4e7864028103ba1127aa6f987e0ca719bf9",
+      "state": "accepted",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": "2026-10-20T08:11:57.123886Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:57.123886Z",
+      "last_activity": "2026-10-20T08:11:57.123886Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0x9296f594119122147d4d8f9ae81ae77fbdc3a0a6e4348b1d47b4bff94b0aa81f",
+      "state": "claimed",
+      "payer_did": "did:key:z6MknAt4WZqzevkUHkXnTGLtAZN19Xt3GgUCG6yHeZeAo8hA",
+      "payee_did": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "7a2942628db7c699409eb35929ab463d",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:53.766983Z",
+      "accept_ts": "2026-10-20T08:11:54.272920Z",
+      "lock_count": 0,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 1,
+      "receipt_outcome": "claimed",
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:54.272920Z",
+      "last_activity": "2026-10-20T08:11:55.277715Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915912314,
+        "expiresMs": 1792656712314,
+        "from": "did:key:z6MknAt4WZqzevkUHkXnTGLtAZN19Xt3GgUCG6yHeZeAo8hA",
+        "id": "0x3fb0a569d9ef22f4b3a0fd734a4dd0264b4b31d070f643a946918a9e105fc7d8",
+        "job": {
+          "id": "7a2942628db7c699409eb35929ab463d",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "70ad66664d78d8bb",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088712314,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:53.766983Z",
+        "_seq": 23317752,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x76915e59c3bc380ecde5c49fe91276b61cdb1087c8f07ca9a72c1b2a21cdc1e7",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "ke9eb278d70",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:53.204069Z",
+      "accept_ts": "2026-10-20T08:11:54.669477Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:54.669477Z",
+      "last_activity": "2026-10-20T08:11:54.669477Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915911777,
+        "expiresMs": 1792656711777,
+        "from": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+        "id": "0x81617b284adf1bf27c0fad8f1cbd749b46dbb38c7b405a33577e08c92bd7d54c",
+        "job": {
+          "id": "ke9eb278d70",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "5e15a6b0575c2565",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088711777,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:53.204069Z",
+        "_seq": 23317748,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x7bcc846ec9dfc2772ecdebbc2c38e1fd96aac9b1aff1fc2fcf84d946a19ad3d3",
+      "state": "accepted",
+      "payer_did": "did:key:z6MknAt4WZqzevkUHkXnTGLtAZN19Xt3GgUCG6yHeZeAo8hA",
+      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "7a2942628db7c699409eb35929ab463d",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:53.766983Z",
+      "accept_ts": "2026-10-20T08:11:54.456020Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:54.456020Z",
+      "last_activity": "2026-10-20T08:11:54.456020Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915912314,
+        "expiresMs": 1792656712314,
+        "from": "did:key:z6MknAt4WZqzevkUHkXnTGLtAZN19Xt3GgUCG6yHeZeAo8hA",
+        "id": "0x3fb0a569d9ef22f4b3a0fd734a4dd0264b4b31d070f643a946918a9e105fc7d8",
+        "job": {
+          "id": "7a2942628db7c699409eb35929ab463d",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "70ad66664d78d8bb",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088712314,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:53.766983Z",
+        "_seq": 23317752,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x3fb0a569d9ef22f4b3a0fd734a4dd0264b4b31d070f643a946918a9e105fc7d8",
+      "state": "proposed",
+      "payer_did": "did:key:z6MknAt4WZqzevkUHkXnTGLtAZN19Xt3GgUCG6yHeZeAo8hA",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "7a2942628db7c699409eb35929ab463d",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:53.766983Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:53.766983Z",
+      "last_activity": "2026-10-20T08:11:53.766983Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915912314,
+        "expiresMs": 1792656712314,
+        "from": "did:key:z6MknAt4WZqzevkUHkXnTGLtAZN19Xt3GgUCG6yHeZeAo8hA",
+        "id": "0x3fb0a569d9ef22f4b3a0fd734a4dd0264b4b31d070f643a946918a9e105fc7d8",
+        "job": {
+          "id": "7a2942628db7c699409eb35929ab463d",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "70ad66664d78d8bb",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088712314,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:53.766983Z",
+        "_seq": 23317752,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0xd052b6fdc2b1d7e379af5e427cb9b843c81c2a8f00741678669660b9ff48d399",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "ke9eb278d70",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:53.204069Z",
+      "accept_ts": "2026-10-20T08:11:53.478161Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:53.478161Z",
+      "last_activity": "2026-10-20T08:11:53.478161Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915911777,
+        "expiresMs": 1792656711777,
+        "from": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+        "id": "0x81617b284adf1bf27c0fad8f1cbd749b46dbb38c7b405a33577e08c92bd7d54c",
+        "job": {
+          "id": "ke9eb278d70",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "5e15a6b0575c2565",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088711777,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:53.204069Z",
+        "_seq": 23317748,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x546e026e90f5bc08d8549a6a6caaaf65d105e4b11b63ffa935f53a7c5f2beafd",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "k19a4f6b342",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:52.070263Z",
+      "accept_ts": "2026-10-20T08:11:53.267921Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:53.267921Z",
+      "last_activity": "2026-10-20T08:11:53.267921Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915911962,
+        "expiresMs": 1792656711962,
+        "from": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+        "id": "0xc523a562e323e4378057207a00e817e5601390d11732a711c3111aece84e9e32",
+        "job": {
+          "id": "k19a4f6b342",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "7e299eeecab8779d",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088711962,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:52.070263Z",
+        "_seq": 23317746,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x81617b284adf1bf27c0fad8f1cbd749b46dbb38c7b405a33577e08c92bd7d54c",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "ke9eb278d70",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:53.204069Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:53.204069Z",
+      "last_activity": "2026-10-20T08:11:53.204069Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915911777,
+        "expiresMs": 1792656711777,
+        "from": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+        "id": "0x81617b284adf1bf27c0fad8f1cbd749b46dbb38c7b405a33577e08c92bd7d54c",
+        "job": {
+          "id": "ke9eb278d70",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "5e15a6b0575c2565",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088711777,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:53.204069Z",
+        "_seq": 23317748,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x7257a9bef94000d1805fdcde5f446a5b1b7a493b386ed81dc37481c222d856fe",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "k19a4f6b342",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:52.070263Z",
+      "accept_ts": "2026-10-20T08:11:52.510854Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:52.510854Z",
+      "last_activity": "2026-10-20T08:11:52.510854Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915911962,
+        "expiresMs": 1792656711962,
+        "from": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+        "id": "0xc523a562e323e4378057207a00e817e5601390d11732a711c3111aece84e9e32",
+        "job": {
+          "id": "k19a4f6b342",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "7e299eeecab8779d",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088711962,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:52.070263Z",
+        "_seq": 23317746,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0xc523a562e323e4378057207a00e817e5601390d11732a711c3111aece84e9e32",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "k19a4f6b342",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:52.070263Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:52.070263Z",
+      "last_activity": "2026-10-20T08:11:52.070263Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915911962,
+        "expiresMs": 1792656711962,
+        "from": "did:key:z6MkpbZ3BTUqrjPgRZLnGRSkk69f7Qu1edi8qTUNdSro7iDF",
+        "id": "0xc523a562e323e4378057207a00e817e5601390d11732a711c3111aece84e9e32",
+        "job": {
+          "id": "k19a4f6b342",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "7e299eeecab8779d",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088711962,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:52.070263Z",
+        "_seq": 23317746,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x4d5133bdca06f50841afbce61c47d38cf81b16b510cb10b7403240ae62277cf5",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkuvyfZF6GsCiDeFPiXcUPe4yV57wQAzhRes4UKeuKgCqS",
+      "payee_did": "did:key:z6MkhefoSonhn5baYJn2dXvvotuyhjmuqfaZ43QMjy23zJM4",
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "720d90dbc022b8602384a838a321bcf1",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:33.301860Z",
+      "accept_ts": "2026-10-20T08:11:47.830175Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:47.830175Z",
+      "last_activity": "2026-10-20T08:11:47.830175Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915891849,
+        "expiresMs": 1792656691849,
+        "from": "did:key:z6MkuvyfZF6GsCiDeFPiXcUPe4yV57wQAzhRes4UKeuKgCqS",
+        "id": "0x6291d06338aa04cb8366255e7041f33c6a85ac54e1bf77771abffafe932811ae",
+        "job": {
+          "id": "720d90dbc022b8602384a838a321bcf1",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "99efe1c2e4380158",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088691849,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:33.301860Z",
+        "_seq": 23317714,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x61cefb65d923487485b59c86b64b31466c12f78771c47cc631ba6ba41e06c7c7",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkmnZbMoEnjqrreunxGz1VEsF7u1cR5jwu1hzhvfRpbME4",
+      "payee_did": "did:key:z6MkitPXYDV2U2KxT9svvHrykmFhoTQYe9hJLgGCcF561oKG",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "k863a3809a9",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:32.746109Z",
+      "accept_ts": "2026-10-20T08:11:36.265485Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:36.265485Z",
+      "last_activity": "2026-10-20T08:11:36.265485Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915891305,
+        "expiresMs": 1792656691305,
+        "from": "did:key:z6MkmnZbMoEnjqrreunxGz1VEsF7u1cR5jwu1hzhvfRpbME4",
+        "id": "0xe97ac15745a6851f75c6a301996c5d73080b87198791db587d76e92aa9cc3a52",
+        "job": {
+          "id": "k863a3809a9",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "0fcc4f4e8a7b0c0f",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088691305,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:32.746109Z",
+        "_seq": 23317713,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0xc2bf890ed471730c2ba2a4075110fe814ac5a99171019142acc58b299c6265e7",
+      "state": "claimed",
+      "payer_did": "did:key:z6MkuvyfZF6GsCiDeFPiXcUPe4yV57wQAzhRes4UKeuKgCqS",
+      "payee_did": "did:key:z6MkmnZbMoEnjqrreunxGz1VEsF7u1cR5jwu1hzhvfRpbME4",
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "720d90dbc022b8602384a838a321bcf1",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:33.301860Z",
+      "accept_ts": "2026-10-20T08:11:33.786750Z",
+      "lock_count": 0,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 1,
+      "receipt_outcome": "claimed",
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:33.786750Z",
+      "last_activity": "2026-10-20T08:11:34.673364Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915891849,
+        "expiresMs": 1792656691849,
+        "from": "did:key:z6MkuvyfZF6GsCiDeFPiXcUPe4yV57wQAzhRes4UKeuKgCqS",
+        "id": "0x6291d06338aa04cb8366255e7041f33c6a85ac54e1bf77771abffafe932811ae",
+        "job": {
+          "id": "720d90dbc022b8602384a838a321bcf1",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "99efe1c2e4380158",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088691849,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:33.301860Z",
+        "_seq": 23317714,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x5a92a68078365f587cc49e80bc03fcecd2fe8eca81edb003b25222418905e53d",
+      "state": "accepted",
+      "payer_did": "did:key:z6MkmnZbMoEnjqrreunxGz1VEsF7u1cR5jwu1hzhvfRpbME4",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "k863a3809a9",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:32.746109Z",
+      "accept_ts": "2026-10-20T08:11:33.909591Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:33.909591Z",
+      "last_activity": "2026-10-20T08:11:33.909591Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915891305,
+        "expiresMs": 1792656691305,
+        "from": "did:key:z6MkmnZbMoEnjqrreunxGz1VEsF7u1cR5jwu1hzhvfRpbME4",
+        "id": "0xe97ac15745a6851f75c6a301996c5d73080b87198791db587d76e92aa9cc3a52",
+        "job": {
+          "id": "k863a3809a9",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "0fcc4f4e8a7b0c0f",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088691305,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:32.746109Z",
+        "_seq": 23317713,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x6291d06338aa04cb8366255e7041f33c6a85ac54e1bf77771abffafe932811ae",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkuvyfZF6GsCiDeFPiXcUPe4yV57wQAzhRes4UKeuKgCqS",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "720d90dbc022b8602384a838a321bcf1",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:33.301860Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:33.301860Z",
+      "last_activity": "2026-10-20T08:11:33.301860Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915891849,
+        "expiresMs": 1792656691849,
+        "from": "did:key:z6MkuvyfZF6GsCiDeFPiXcUPe4yV57wQAzhRes4UKeuKgCqS",
+        "id": "0x6291d06338aa04cb8366255e7041f33c6a85ac54e1bf77771abffafe932811ae",
+        "job": {
+          "id": "720d90dbc022b8602384a838a321bcf1",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "99efe1c2e4380158",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088691849,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:33.301860Z",
+        "_seq": 23317714,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0xe97ac15745a6851f75c6a301996c5d73080b87198791db587d76e92aa9cc3a52",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkmnZbMoEnjqrreunxGz1VEsF7u1cR5jwu1hzhvfRpbME4",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "k863a3809a9",
+        "proto": "kibble"
+      },
+      "offer_ts": "2026-10-20T08:11:32.746109Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:32.746109Z",
+      "last_activity": "2026-10-20T08:11:32.746109Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792915891305,
+        "expiresMs": 1792656691305,
+        "from": "did:key:z6MkmnZbMoEnjqrreunxGz1VEsF7u1cR5jwu1hzhvfRpbME4",
+        "id": "0xe97ac15745a6851f75c6a301996c5d73080b87198791db587d76e92aa9cc3a52",
+        "job": {
+          "id": "k863a3809a9",
+          "proto": "kibble"
+        },
+        "lock": "hash",
+        "nonce": "0fcc4f4e8a7b0c0f",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088691305,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:32.746109Z",
+        "_seq": 23317713,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x411a4ba6afc3074cfcf926206a067069b42b6d6d9c6e6d3b5bac410dae868966",
+      "state": "accepted",
+      "payer_did": "did:key:z6MksUTJ11YdB8q5LwNBK38kY8TNRaCbioqw3PHCqx8aTfkP",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-69b824cc",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:11:31.358516Z",
+      "accept_ts": "2026-10-20T08:11:32.498968Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:32.498968Z",
+      "last_activity": "2026-10-20T08:11:32.498968Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485690744,
+        "expiresMs": 1792484490744,
+        "from": "did:key:z6MksUTJ11YdB8q5LwNBK38kY8TNRaCbioqw3PHCqx8aTfkP",
+        "id": "0x17d70de9aad153f5c506667ffbaa708cae022554c665cc722278e6be5c7cd6d2",
+        "job": {
+          "id": "demo-69b824cc",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "4b6b7fb71ddb3d66",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487490744,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:31.358516Z",
+        "_seq": 23317710,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x17d70de9aad153f5c506667ffbaa708cae022554c665cc722278e6be5c7cd6d2",
+      "state": "proposed",
+      "payer_did": "did:key:z6MksUTJ11YdB8q5LwNBK38kY8TNRaCbioqw3PHCqx8aTfkP",
+      "payee_did": null,
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-69b824cc",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:11:31.358516Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:31.358516Z",
+      "last_activity": "2026-10-20T08:11:31.358516Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485690744,
+        "expiresMs": 1792484490744,
+        "from": "did:key:z6MksUTJ11YdB8q5LwNBK38kY8TNRaCbioqw3PHCqx8aTfkP",
+        "id": "0x17d70de9aad153f5c506667ffbaa708cae022554c665cc722278e6be5c7cd6d2",
+        "job": {
+          "id": "demo-69b824cc",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "4b6b7fb71ddb3d66",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487490744,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:31.358516Z",
+        "_seq": 23317710,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x7bc6ee7a236adf70e2724f588c76d171695845f5b4a25444d973fa4136c2675d",
+      "state": "accepted",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": "2026-10-20T08:11:18.178785Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:18.178785Z",
+      "last_activity": "2026-10-20T08:11:18.178785Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0x6b8068049b0ded79f245d1e8e035eb36c709eb77b0fd350257574e987ab52573",
+      "state": "claimed",
+      "payer_did": "did:key:z6MkfegdiaE7CEYVrC1V7rWmRLTceKZpuY5wLkYDnJUSunhU",
+      "payee_did": "did:key:z6Mkfao9edf7Xb5rha9KRyMXqnK9pyr55mc7BNkKugdHoiGy",
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "177cdf5f5f4a65b0ed86bb15e21d4e15",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:15.493797Z",
+      "accept_ts": "2026-10-20T08:11:15.959762Z",
+      "lock_count": 0,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 1,
+      "receipt_outcome": "claimed",
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:15.959762Z",
+      "last_activity": "2026-10-20T08:11:16.850599Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915874056,
+        "expiresMs": 1792656674056,
+        "from": "did:key:z6MkfegdiaE7CEYVrC1V7rWmRLTceKZpuY5wLkYDnJUSunhU",
+        "id": "0x757a15a95e19d38dfc165e0e86b897a73a4ed1f2abb08edab0b83dd10eeff3bc",
+        "job": {
+          "id": "177cdf5f5f4a65b0ed86bb15e21d4e15",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "1833d5ef26ce1c51",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088674056,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:15.493797Z",
+        "_seq": 23317685,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x757a15a95e19d38dfc165e0e86b897a73a4ed1f2abb08edab0b83dd10eeff3bc",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkfegdiaE7CEYVrC1V7rWmRLTceKZpuY5wLkYDnJUSunhU",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "177cdf5f5f4a65b0ed86bb15e21d4e15",
+        "proto": "pin"
+      },
+      "offer_ts": "2026-10-20T08:11:15.493797Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:15.493797Z",
+      "last_activity": "2026-10-20T08:11:15.493797Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "PAPER",
+        "claimByMs": 1792915874056,
+        "expiresMs": 1792656674056,
+        "from": "did:key:z6MkfegdiaE7CEYVrC1V7rWmRLTceKZpuY5wLkYDnJUSunhU",
+        "id": "0x757a15a95e19d38dfc165e0e86b897a73a4ed1f2abb08edab0b83dd10eeff3bc",
+        "job": {
+          "id": "177cdf5f5f4a65b0ed86bb15e21d4e15",
+          "proto": "pin"
+        },
+        "lock": "hash",
+        "nonce": "1833d5ef26ce1c51",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1793088674056,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:15.493797Z",
+        "_seq": 23317685,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x29a7f3e6640c0961a14d6a84788e13c5ebfb6ae416230d57239c8972cc3c63ff",
+      "state": "accepted",
+      "payer_did": "did:key:z6Mknbq2MswgkeFZmVpnTytPt1Pr9UsicDBaEBpxbJLQdWtG",
+      "payee_did": "did:key:z6MkjBLMxfQeb7nRo5iHM6EtaFBJ8rLS7nnhWKNG5QiuXiq3",
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-59a19a0a",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:11:11.639003Z",
+      "accept_ts": "2026-10-20T08:11:12.340232Z",
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:12.340232Z",
+      "last_activity": "2026-10-20T08:11:12.340232Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485671055,
+        "expiresMs": 1792484471055,
+        "from": "did:key:z6Mknbq2MswgkeFZmVpnTytPt1Pr9UsicDBaEBpxbJLQdWtG",
+        "id": "0x55c2e1e5c39f9182ed7970076e1fe38be6a0ada37b233f1e8eb68d5b71934878",
+        "job": {
+          "id": "demo-59a19a0a",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "865da2b2c45351a4",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487471055,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:11.639003Z",
+        "_seq": 23317677,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x55c2e1e5c39f9182ed7970076e1fe38be6a0ada37b233f1e8eb68d5b71934878",
+      "state": "proposed",
+      "payer_did": "did:key:z6Mknbq2MswgkeFZmVpnTytPt1Pr9UsicDBaEBpxbJLQdWtG",
+      "payee_did": null,
+      "amount": "1000000",
+      "asset": "PAPER",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "demo-59a19a0a",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T08:11:11.639003Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:11:11.639003Z",
+      "last_activity": "2026-10-20T08:11:11.639003Z",
+      "offer_frame": {
+        "amount": "1000000",
+        "asset": "PAPER",
+        "claimByMs": 1792485671055,
+        "expiresMs": 1792484471055,
+        "from": "did:key:z6Mknbq2MswgkeFZmVpnTytPt1Pr9UsicDBaEBpxbJLQdWtG",
+        "id": "0x55c2e1e5c39f9182ed7970076e1fe38be6a0ada37b233f1e8eb68d5b71934878",
+        "job": {
+          "id": "demo-59a19a0a",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "865da2b2c45351a4",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792487471055,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:11:11.639003Z",
+        "_seq": 23317677,
+        "_room": "tclk-offers"
+      }
+    },
+    {
+      "contract_id": "0x40126cfcd85acba168a0537052127253b982a35024bce8018a32983296b16382",
+      "state": "revealed",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:10:38.679253Z",
+      "last_activity": "2026-10-20T08:10:38.679253Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0xac44e9cf88f2bca001135c2e6cdc5c138e3542414c8b3c0aa942fe86d396ff46",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery prize for round r-20261020-0805: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+        "id": "lotto:prize:r-20261020-0805:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-prize"
+      },
+      "offer_ts": "2026-10-20T08:10:38.468333Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:10:38.468333Z",
+      "last_activity": "2026-10-20T08:10:38.468333Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792570236567,
+        "expiresMs": 1792527036567,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0xac44e9cf88f2bca001135c2e6cdc5c138e3542414c8b3c0aa942fe86d396ff46",
+        "job": {
+          "context": "FLOP Lottery prize for round r-20261020-0805: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+          "id": "lotto:prize:r-20261020-0805:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-prize"
+        },
+        "lock": "hash",
+        "nonce": "a1e07eb96d01d812",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792613436567,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:10:38.468333Z",
+        "_seq": 88456,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x21cdf78284d7717e9d2274ac8ef98198154dff2f1dab7c5273ff567fc318ae85",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "50",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0805. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+        "id": "lotto:rebate:r-20261020-0805:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-rebate"
+      },
+      "offer_ts": "2026-10-20T08:06:16.160094Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:06:16.160094Z",
+      "last_activity": "2026-10-20T08:06:16.160094Z",
+      "offer_frame": {
+        "amount": "50",
+        "asset": "FLOP",
+        "claimByMs": 1792613173385,
+        "expiresMs": 1792569973385,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0x21cdf78284d7717e9d2274ac8ef98198154dff2f1dab7c5273ff567fc318ae85",
+        "job": {
+          "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0805. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+          "id": "lotto:rebate:r-20261020-0805:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-rebate"
+        },
+        "lock": "hash",
+        "nonce": "3ad86a957c5d9228",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792656373385,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:06:16.160094Z",
+        "_seq": 88452,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x7728609e9cdf44b919aafa822feb6c831cce86b9c86d0d4298a1a3b0c681db4b",
+      "state": "locked",
+      "payer_did": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+      "payee_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0805. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+        "id": "lotto:ticket:r-20261020-0805:1:57be4b2a37a31cd4",
+        "proto": "lotto"
+      },
+      "offer_ts": "2026-10-20T08:05:58.333426Z",
+      "accept_ts": "2026-10-20T08:06:01.186790Z",
+      "lock_count": 1,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:06:01.186790Z",
+      "last_activity": "2026-10-20T08:06:03.886406Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792492800000,
+        "expiresMs": 1792483740000,
+        "from": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "id": "0x8ec211cc16e32dff494befdadb4bf61a009f1d76cf37a59b528f937231399fa8",
+        "job": {
+          "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0805. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+          "id": "lotto:ticket:r-20261020-0805:1:57be4b2a37a31cd4",
+          "proto": "lotto"
+        },
+        "lock": "hash",
+        "nonce": "57be4b2a37a31cd4",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792536000000,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:05:58.333426Z",
+        "_seq": 88448,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x8ec211cc16e32dff494befdadb4bf61a009f1d76cf37a59b528f937231399fa8",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0805. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+        "id": "lotto:ticket:r-20261020-0805:1:57be4b2a37a31cd4",
+        "proto": "lotto"
+      },
+      "offer_ts": "2026-10-20T08:05:58.333426Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:05:58.333426Z",
+      "last_activity": "2026-10-20T08:05:58.333426Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792492800000,
+        "expiresMs": 1792483740000,
+        "from": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "id": "0x8ec211cc16e32dff494befdadb4bf61a009f1d76cf37a59b528f937231399fa8",
+        "job": {
+          "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0805. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+          "id": "lotto:ticket:r-20261020-0805:1:57be4b2a37a31cd4",
+          "proto": "lotto"
+        },
+        "lock": "hash",
+        "nonce": "57be4b2a37a31cd4",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792536000000,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:05:58.333426Z",
+        "_seq": 88448,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0xf051752c340055e1ecc83d2d388dbaf90867e613750e10b3c90130491f11b214",
+      "state": "revealed",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:00:46.725263Z",
+      "last_activity": "2026-10-20T08:00:46.725263Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0x13f8198af6e1fd9c9f1bf290cba265b12bc54c8831e3725a2b5bac55addcec1c",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery prize for round r-20261020-0755: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+        "id": "lotto:prize:r-20261020-0755:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-prize"
+      },
+      "offer_ts": "2026-10-20T08:00:46.542518Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T08:00:46.542518Z",
+      "last_activity": "2026-10-20T08:00:46.542518Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792569644846,
+        "expiresMs": 1792526444846,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0x13f8198af6e1fd9c9f1bf290cba265b12bc54c8831e3725a2b5bac55addcec1c",
+        "job": {
+          "context": "FLOP Lottery prize for round r-20261020-0755: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+          "id": "lotto:prize:r-20261020-0755:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-prize"
+        },
+        "lock": "hash",
+        "nonce": "b764b678631b8542",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792612844846,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T08:00:46.542518Z",
+        "_seq": 88445,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0xfea26463fd525fd06bcec1201f78ded9a0a216449e7e45f614b942682788cdb5",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "50",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0755. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+        "id": "lotto:rebate:r-20261020-0755:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-rebate"
+      },
+      "offer_ts": "2026-10-20T07:56:24.557727Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:56:24.557727Z",
+      "last_activity": "2026-10-20T07:56:24.557727Z",
+      "offer_frame": {
+        "amount": "50",
+        "asset": "FLOP",
+        "claimByMs": 1792612582609,
+        "expiresMs": 1792569382609,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0xfea26463fd525fd06bcec1201f78ded9a0a216449e7e45f614b942682788cdb5",
+        "job": {
+          "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0755. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+          "id": "lotto:rebate:r-20261020-0755:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-rebate"
+        },
+        "lock": "hash",
+        "nonce": "5ca6679ea7289a45",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792655782609,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:56:24.557727Z",
+        "_seq": 88441,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0xd48ced1950c48150f2204e83d8f9a1237b784da110dc06a453995657a6fd4df7",
+      "state": "locked",
+      "payer_did": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+      "payee_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0755. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+        "id": "lotto:ticket:r-20261020-0755:1:0af358ed8db38295",
+        "proto": "lotto"
+      },
+      "offer_ts": "2026-10-20T07:55:58.159865Z",
+      "accept_ts": "2026-10-20T07:56:02.679489Z",
+      "lock_count": 1,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:56:02.679489Z",
+      "last_activity": "2026-10-20T07:56:04.792507Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792492200000,
+        "expiresMs": 1792483140000,
+        "from": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "id": "0xb4bf2b64305918deac774d9f0c6afb80303eceb5e4e6555eb5b0a4c54cc657c0",
+        "job": {
+          "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0755. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+          "id": "lotto:ticket:r-20261020-0755:1:0af358ed8db38295",
+          "proto": "lotto"
+        },
+        "lock": "hash",
+        "nonce": "0af358ed8db38295",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792535400000,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:55:58.159865Z",
+        "_seq": 88437,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0xb4bf2b64305918deac774d9f0c6afb80303eceb5e4e6555eb5b0a4c54cc657c0",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0755. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+        "id": "lotto:ticket:r-20261020-0755:1:0af358ed8db38295",
+        "proto": "lotto"
+      },
+      "offer_ts": "2026-10-20T07:55:58.159865Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:55:58.159865Z",
+      "last_activity": "2026-10-20T07:55:58.159865Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792492200000,
+        "expiresMs": 1792483140000,
+        "from": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "id": "0xb4bf2b64305918deac774d9f0c6afb80303eceb5e4e6555eb5b0a4c54cc657c0",
+        "job": {
+          "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0755. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+          "id": "lotto:ticket:r-20261020-0755:1:0af358ed8db38295",
+          "proto": "lotto"
+        },
+        "lock": "hash",
+        "nonce": "0af358ed8db38295",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792535400000,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:55:58.159865Z",
+        "_seq": 88437,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x9c7aacc0f48a81dfb508f0c1c283ec54b8aef7b20edbbd4240cabafe50ed6877",
+      "state": "proposed",
+      "payer_did": null,
+      "payee_did": "did:key:z6MkrmEFMfqB3PRh9K5hFb88Wv4c1ke6BN93Pz87bWSa9tcf",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "flop-htlc",
+        "paper",
+        "x402"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "task-24cc5946",
+        "proto": "acp"
+      },
+      "offer_ts": "2026-10-20T07:55:55.162610Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:55:55.162610Z",
+      "last_activity": "2026-10-20T07:55:55.162610Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792486553073,
+        "expiresMs": 1792484753073,
+        "from": "did:key:z6MkrmEFMfqB3PRh9K5hFb88Wv4c1ke6BN93Pz87bWSa9tcf",
+        "id": "0x9c7aacc0f48a81dfb508f0c1c283ec54b8aef7b20edbbd4240cabafe50ed6877",
+        "job": {
+          "id": "task-24cc5946",
+          "proto": "acp"
+        },
+        "lock": "hash",
+        "nonce": "d736000e091f3cb4",
+        "rails": [
+          "flop-htlc",
+          "paper",
+          "x402"
+        ],
+        "refundAfterMs": 1792490153073,
+        "role": "payee",
+        "type": "offer",
+        "_ts": "2026-10-20T07:55:55.162610Z",
+        "_seq": 215345,
+        "_room": "crypto"
+      }
+    },
+    {
+      "contract_id": "0xcf0e90651974257a98dfbc35d0584a24ccc882613d439f908087e175c65d02ab",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkmF8JQvdvkNMcGVGbYfJm6uVScmNWJmLGYdNjjYKvxo3e",
+      "payee_did": null,
+      "amount": "500",
+      "asset": "FLOP",
+      "rails": [
+        "flop-htlc",
+        "paper",
+        "x402"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "id": "task-f456a93f",
+        "proto": "a2a"
+      },
+      "offer_ts": "2026-10-20T07:54:36.939953Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:54:36.939953Z",
+      "last_activity": "2026-10-20T07:54:36.939953Z",
+      "offer_frame": {
+        "amount": "500",
+        "asset": "FLOP",
+        "claimByMs": 1792486475835,
+        "expiresMs": 1792484675835,
+        "from": "did:key:z6MkmF8JQvdvkNMcGVGbYfJm6uVScmNWJmLGYdNjjYKvxo3e",
+        "id": "0xcf0e90651974257a98dfbc35d0584a24ccc882613d439f908087e175c65d02ab",
+        "job": {
+          "id": "task-f456a93f",
+          "proto": "a2a"
+        },
+        "lock": "hash",
+        "nonce": "7317e45ecb4ab1eb",
+        "rails": [
+          "flop-htlc",
+          "paper",
+          "x402"
+        ],
+        "refundAfterMs": 1792490075835,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:54:36.939953Z",
+        "_seq": 215341,
+        "_room": "crypto"
+      }
+    },
+    {
+      "contract_id": "0x6ee729b916be291dca8e986d59cd4a431fa081a8d359d79658c2524de11b2f75",
+      "state": "revealed",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:50:56.642718Z",
+      "last_activity": "2026-10-20T07:50:56.642718Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0x581900ce9592ee53127ee59fb28ae45df34c7b9cd1d806f9dc22de5f16a81a4e",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery prize for round r-20261020-0745: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+        "id": "lotto:prize:r-20261020-0745:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-prize"
+      },
+      "offer_ts": "2026-10-20T07:50:33.784271Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:50:33.784271Z",
+      "last_activity": "2026-10-20T07:50:33.784271Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792569032167,
+        "expiresMs": 1792525832167,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0x581900ce9592ee53127ee59fb28ae45df34c7b9cd1d806f9dc22de5f16a81a4e",
+        "job": {
+          "context": "FLOP Lottery prize for round r-20261020-0745: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+          "id": "lotto:prize:r-20261020-0745:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-prize"
+        },
+        "lock": "hash",
+        "nonce": "5a8a737417b3ed73",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792612232167,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:50:33.784271Z",
+        "_seq": 88434,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x27051aa5f2adfa68e48d38948f9b0dd9dcef02233cd1cd92e3b431bab5b39ac4",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "50",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0745. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+        "id": "lotto:rebate:r-20261020-0745:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-rebate"
+      },
+      "offer_ts": "2026-10-20T07:46:12.311133Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:46:12.311133Z",
+      "last_activity": "2026-10-20T07:46:12.311133Z",
+      "offer_frame": {
+        "amount": "50",
+        "asset": "FLOP",
+        "claimByMs": 1792611970136,
+        "expiresMs": 1792568770136,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0x27051aa5f2adfa68e48d38948f9b0dd9dcef02233cd1cd92e3b431bab5b39ac4",
+        "job": {
+          "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0745. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+          "id": "lotto:rebate:r-20261020-0745:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-rebate"
+        },
+        "lock": "hash",
+        "nonce": "1766e7102f7f394b",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792655170136,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:46:12.311133Z",
+        "_seq": 88430,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0xf93c0c9822b67c46d255a4068c8bd93df6639b63b1f6b418a64d53e7c8c83e0e",
+      "state": "locked",
+      "payer_did": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+      "payee_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0745. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+        "id": "lotto:ticket:r-20261020-0745:1:6b58e715925aad55",
+        "proto": "lotto"
+      },
+      "offer_ts": "2026-10-20T07:46:01.776419Z",
+      "accept_ts": "2026-10-20T07:46:04.926330Z",
+      "lock_count": 1,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:46:04.926330Z",
+      "last_activity": "2026-10-20T07:46:05.731700Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792491600000,
+        "expiresMs": 1792482540000,
+        "from": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "id": "0x9d14dc07fe886d59bd3591a5a7bf9ed0aa6e91b7e37d4071720dc165c1866b97",
+        "job": {
+          "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0745. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+          "id": "lotto:ticket:r-20261020-0745:1:6b58e715925aad55",
+          "proto": "lotto"
+        },
+        "lock": "hash",
+        "nonce": "6b58e715925aad55",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792534800000,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:46:01.776419Z",
+        "_seq": 88426,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x9d14dc07fe886d59bd3591a5a7bf9ed0aa6e91b7e37d4071720dc165c1866b97",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0745. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+        "id": "lotto:ticket:r-20261020-0745:1:6b58e715925aad55",
+        "proto": "lotto"
+      },
+      "offer_ts": "2026-10-20T07:46:01.776419Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:46:01.776419Z",
+      "last_activity": "2026-10-20T07:46:01.776419Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792491600000,
+        "expiresMs": 1792482540000,
+        "from": "did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "id": "0x9d14dc07fe886d59bd3591a5a7bf9ed0aa6e91b7e37d4071720dc165c1866b97",
+        "job": {
+          "context": "FLOP Lottery ticket: 1 × 100 paper in round r-20261020-0745. Operator accepts, buyer locks, operator reveals after the draw. Rules: lotto.js",
+          "id": "lotto:ticket:r-20261020-0745:1:6b58e715925aad55",
+          "proto": "lotto"
+        },
+        "lock": "hash",
+        "nonce": "6b58e715925aad55",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792534800000,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:46:01.776419Z",
+        "_seq": 88426,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0xbdd2fcd0e0bd5e0069d8a6d2c0f02a3135f86f91f11fbb29c1713d7d48ee65e7",
+      "state": "revealed",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:40:46.700503Z",
+      "last_activity": "2026-10-20T07:40:46.700503Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0xc9f95133df55f7e0365ef690875f3e3d9a28f099aaeac7371e0d6ec0954b2047",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "100",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "FLOP Lottery prize for round r-20261020-0735: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+        "id": "lotto:prize:r-20261020-0735:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-prize"
+      },
+      "offer_ts": "2026-10-20T07:40:46.102712Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:40:46.102712Z",
+      "last_activity": "2026-10-20T07:40:46.102712Z",
+      "offer_frame": {
+        "amount": "100",
+        "asset": "FLOP",
+        "claimByMs": 1792568443201,
+        "expiresMs": 1792525243201,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0xc9f95133df55f7e0365ef690875f3e3d9a28f099aaeac7371e0d6ec0954b2047",
+        "job": {
+          "context": "FLOP Lottery prize for round r-20261020-0735: 100 paper to did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2. Only the winner's accept is locked.",
+          "id": "lotto:prize:r-20261020-0735:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-prize"
+        },
+        "lock": "hash",
+        "nonce": "3ea1da9003eefc86",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792611643201,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:40:46.102712Z",
+        "_seq": 88423,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x25711353dc036b34d9104dc8b7f0ed36f93fed166e7982f7fcb7ad4d18824db0",
+      "state": "proposed",
+      "payer_did": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+      "payee_did": null,
+      "amount": "50",
+      "asset": "FLOP",
+      "rails": [
+        "paper"
+      ],
+      "lock_kind": "hash",
+      "job": {
+        "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0735. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+        "id": "lotto:rebate:r-20261020-0735:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+        "proto": "lotto-rebate"
+      },
+      "offer_ts": "2026-10-20T07:36:23.606997Z",
+      "accept_ts": null,
+      "lock_count": 0,
+      "reveal_count": 0,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-20T07:36:23.606997Z",
+      "last_activity": "2026-10-20T07:36:23.606997Z",
+      "offer_frame": {
+        "amount": "50",
+        "asset": "FLOP",
+        "claimByMs": 1792611381879,
+        "expiresMs": 1792568181879,
+        "from": "did:key:z6MkgNoN4KAGFHqxk91pHoEFrSFFKwZgacdLam7KuYvQ93Fd",
+        "id": "0x25711353dc036b34d9104dc8b7f0ed36f93fed166e7982f7fcb7ad4d18824db0",
+        "job": {
+          "context": "Rebate: 50 paper for buying in FLOP Lottery round r-20261020-0735. Accept with did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2 (statement = sha256 of a secret you keep), I lock, you reveal. https://alphaotc.xyz/lotto/skill.md",
+          "id": "lotto:rebate:r-20261020-0735:did:key:z6MkpM6GWdFZmbdwy8uUbBJiutGHMQR6Fm69e3CYF6jvabi2",
+          "proto": "lotto-rebate"
+        },
+        "lock": "hash",
+        "nonce": "21fb0c2679ff4056",
+        "rails": [
+          "paper"
+        ],
+        "refundAfterMs": 1792654581879,
+        "role": "payer",
+        "type": "offer",
+        "_ts": "2026-10-20T07:36:23.606997Z",
+        "_seq": 88419,
+        "_room": "mb-flop-lotto"
+      }
+    },
+    {
+      "contract_id": "0x10b66eba24d78170f0ac4e547a05a24becb39f466bf2ccecb8c954dd88c82767",
+      "state": "revealed",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": null,
+      "lock_count": 1,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-15T10:44:19.328349Z",
+      "last_activity": "2026-10-15T10:44:23.538711Z",
+      "offer_frame": null
+    },
+    {
+      "contract_id": "0xd67e165124fcb5bfc64f715bb9b2ac51b5aec8496381b856b4efc1289471aba0",
+      "state": "revealed",
+      "payer_did": null,
+      "payee_did": null,
+      "amount": null,
+      "asset": null,
+      "rails": [],
+      "lock_kind": null,
+      "job": null,
+      "offer_ts": null,
+      "accept_ts": null,
+      "lock_count": 1,
+      "reveal_count": 1,
+      "refund_count": 0,
+      "cancel_count": 0,
+      "receipt_count": 0,
+      "receipt_outcome": null,
+      "heartbeat_count": 0,
+      "first_seen": "2026-10-09T10:41:26.146138Z",
+      "last_activity": "2026-10-09T10:41:31.216426Z",
+      "offer_frame": null
     }
   ]
 }
